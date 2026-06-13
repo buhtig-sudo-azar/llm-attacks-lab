@@ -2,25 +2,29 @@
 
 import { ProcessingFlowDiagramData } from '@/types';
 
-const NODE_PAD_X = 16;
-const NODE_PAD_Y = 8;
-const NODE_H = 32;
-const FONT_SIZE = 12;
-const DETAIL_SIZE = 9;
-const STEP_GAP = 32;
-const SIDE_PAD = 48;
+const ROLE_STYLES: Record<string, {
+  fill: string; stroke: string; text: string; numberBg: string; numberText: string;
+  isPill?: boolean;
+}> = {
+  input:    { fill: '#eff6ff', stroke: '#3b82f6', text: '#1d4ed8', numberBg: '#3b82f6', numberText: '#ffffff', isPill: true },
+  process:  { fill: '#ffffff', stroke: '#e2e8f0', text: '#334155', numberBg: '#f1f5f9', numberText: '#64748b' },
+  decision: { fill: '#faf5ff', stroke: '#a855f7', text: '#6b21a8', numberBg: '#a855f7', numberText: '#ffffff' },
+  output:   { fill: '#ffffff', stroke: '#e2e8f0', text: '#334155', numberBg: '#f1f5f9', numberText: '#64748b' },
+  danger:   { fill: '#fef2f2', stroke: '#ef4444', text: '#991b1b', numberBg: '#ef4444', numberText: '#ffffff' },
+  success:  { fill: '#f0fdf4', stroke: '#22c55e', text: '#166534', numberBg: '#22c55e', numberText: '#ffffff', isPill: true },
+  warning:  { fill: '#fffbeb', stroke: '#f59e0b', text: '#92400e', numberBg: '#f59e0b', numberText: '#ffffff' },
+  neutral:  { fill: '#ffffff', stroke: '#e2e8f0', text: '#334155', numberBg: '#f1f5f9', numberText: '#64748b' },
+};
 
-function measureStepWidth(step: { label: string; detail?: string; branchLabel?: string }): number {
-  const labelW = step.label.length * FONT_SIZE * 0.6;
-  const detailW = step.detail ? step.detail.length * DETAIL_SIZE * 0.55 : 0;
-  const branchW = step.branchLabel ? step.branchLabel.length * 9 * 0.6 + 16 : 0;
-  return Math.max(labelW, detailW) + NODE_PAD_X * 2 + branchW;
-}
+const NODE_W = 280;
+const NODE_H = 56;
+const NUMBER_R = 14;
+const STEP_GAP = 20;
+const SIDE_PAD = 48;
 
 export function ProcessingFlowDiagram({ data }: { data: ProcessingFlowDiagramData }) {
   const steps = data.steps;
-  const maxW = Math.max(...steps.map(measureStepWidth));
-  const svgW = maxW + SIDE_PAD * 2;
+  const svgW = NODE_W + SIDE_PAD * 2;
   const cx = svgW / 2;
   const svgH = 16 + steps.length * (NODE_H + STEP_GAP) - STEP_GAP + 16;
 
@@ -30,73 +34,104 @@ export function ProcessingFlowDiagram({ data }: { data: ProcessingFlowDiagramDat
 
   return (
     <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
+      <defs>
+        <filter id="pf-node-shadow" x="-8%" y="-8%" width="116%" height="124%">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000" floodOpacity="0.06" />
+        </filter>
+        <filter id="pf-active-shadow" x="-8%" y="-8%" width="116%" height="124%">
+          <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="#3b82f6" floodOpacity="0.15" />
+        </filter>
+
+        {/* Arrow marker */}
+        <marker id="pf-arrow" viewBox="0 0 10 7" refX={10} refY={3.5} markerWidth={8} markerHeight={6} orient="auto">
+          <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e1" />
+        </marker>
+
+        {/* Dot pattern for background */}
+        <pattern id="pf-dots" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+          <circle cx="10" cy="10" r="0.8" fill="#e2e8f0" opacity="0.5" />
+        </pattern>
+      </defs>
+
+      {/* Background dot grid */}
+      <rect width={svgW} height={svgH} fill="url(#pf-dots)" />
+
       {steps.map((step, i) => {
         const y = stepY(i);
         const prevY = i > 0 ? stepY(i - 1) : null;
+        const style = ROLE_STYLES[step.role] || ROLE_STYLES.neutral;
+        const isPill = style.isPill;
+        const isActive = step.role === 'input';
         const hasDetail = !!step.detail;
-        const nh = hasDetail ? NODE_H + 14 : NODE_H;
-        const isInput = step.role === 'input';
-        const isDanger = step.role === 'danger';
-        const isDecision = step.role === 'decision';
-        const isSuccess = step.role === 'success';
+        const nh = hasDetail ? NODE_H + 12 : NODE_H;
+        const rx = isPill ? nh / 2 : 10;
 
-        // Determine border color
-        let borderColor = '#94a3b8';
-        let textColor = '#334155';
-        let bgColor = 'transparent';
-        let bgOpacity = 0;
-        if (isInput) { borderColor = '#3b82f6'; textColor = '#3b82f6'; bgColor = '#3b82f6'; bgOpacity = 0.04; }
-        if (isDanger) { borderColor = '#ef4444'; textColor = '#ef4444'; bgColor = '#ef4444'; bgOpacity = 0.04; }
-        if (isSuccess) { borderColor = '#10b981'; textColor = '#10b981'; bgColor = '#10b981'; bgOpacity = 0.04; }
-        if (isDecision) { borderColor = '#8b5cf6'; textColor = '#8b5cf6'; bgColor = '#8b5cf6'; bgOpacity = 0.04; }
-
-        const sw = measureStepWidth(step);
-        const isPill = isInput || isSuccess;
-        const rx = isPill ? nh / 2 : 4;
+        // Number badge position
+        const numCx = cx - NODE_W / 2 + 24;
+        const numCy = y;
 
         return (
           <g key={i}>
-            {/* Connector */}
+            {/* Connector line */}
             {prevY !== null && (
-              <line x1={cx} y1={prevY + (step.detail ? NODE_H + 14 : NODE_H) / 2 + 2} x2={cx} y2={y - nh / 2 - 2}
-                stroke="#94a3b8" strokeWidth={1} />
+              <line x1={cx} y1={prevY + (steps[i - 1].detail ? NODE_H + 12 : NODE_H) / 2 + 2}
+                x2={cx} y2={y - nh / 2 - 2}
+                stroke="#cbd5e1" strokeWidth="1.5" markerEnd="url(#pf-arrow)"
+              />
             )}
 
-            {/* Branch label */}
-            {step.branchLabel && (
-              <g>
-                <text
-                  x={cx + sw / 2 + 8} y={y + 1}
-                  fill={borderColor} fontSize={9} fontWeight={500} dominantBaseline="middle"
-                >
-                  {step.branchLabel}
-                </text>
-              </g>
-            )}
-
-            {/* Node */}
+            {/* Node card */}
             <rect
-              x={cx - sw / 2} y={y - nh / 2}
-              width={sw} height={nh}
+              x={cx - NODE_W / 2} y={y - nh / 2}
+              width={NODE_W} height={nh}
               rx={rx}
-              fill={bgColor} fillOpacity={bgOpacity}
-              stroke={borderColor} strokeWidth={1}
+              fill={style.fill}
+              stroke={style.stroke}
+              strokeWidth={isActive ? 2 : 1.5}
+              filter={isActive ? 'url(#pf-active-shadow)' : 'url(#pf-node-shadow)'}
             />
+
+            {/* Step number badge */}
+            <circle cx={numCx} cy={numCy} r={NUMBER_R}
+              fill={style.numberBg}
+            />
+            <text x={numCx} y={numCy + 1} textAnchor="middle" dominantBaseline="middle"
+              fill={style.numberText} fontSize="11" fontWeight="700">
+              {i + 1}
+            </text>
 
             {/* Label */}
             <text
-              x={cx} y={hasDetail ? y - 4 : y}
-              textAnchor="middle" dominantBaseline="middle"
-              fill={textColor} fontSize={FONT_SIZE} fontWeight={isInput || isDanger ? 600 : 500}
+              x={numCx + NUMBER_R + 12} y={hasDetail ? y - 5 : y}
+              fill={style.text} fontSize="13" fontWeight="600" dominantBaseline="middle"
             >
               {step.label}
             </text>
 
             {/* Detail */}
             {step.detail && (
-              <text x={cx} y={y + 12} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" fontSize={DETAIL_SIZE}>
+              <text
+                x={numCx + NUMBER_R + 12} y={y + 12}
+                fill="#94a3b8" fontSize="10" dominantBaseline="middle"
+              >
                 {step.detail}
               </text>
+            )}
+
+            {/* Branch label */}
+            {step.branchLabel && (
+              <g>
+                <rect x={cx + NODE_W / 2 + 8} y={y - 10} width={80} height={20} rx={4}
+                  fill={style.fill} stroke={style.stroke} strokeWidth="1"
+                />
+                <text x={cx + NODE_W / 2 + 48} y={y + 1} textAnchor="middle" dominantBaseline="middle"
+                  fill={style.text} fontSize="9" fontWeight="600">
+                  {step.branchLabel}
+                </text>
+                <line x1={cx + NODE_W / 2} y1={y} x2={cx + NODE_W / 2 + 8} y2={y}
+                  stroke={style.stroke} strokeWidth="1" strokeOpacity="0.5"
+                />
+              </g>
             )}
           </g>
         );

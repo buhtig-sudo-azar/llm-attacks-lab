@@ -2,150 +2,151 @@
 
 import { KnowledgeMapData } from '@/types';
 
-const NODE_PAD_X = 16;
-const NODE_PAD_Y = 8;
-const NODE_H = 32;
-const FONT_SIZE = 12;
-const LEVEL_GAP = 48;
-const SIBLING_GAP = 20;
-const INDENT = 24;
-const SIDE_PAD = 20;
-const TOP_PAD = 16;
+const TOPIC_COLORS = [
+  { fill: '#eff6ff', stroke: '#3b82f6', text: '#1d4ed8' },   // blue
+  { fill: '#fffbeb', stroke: '#f59e0b', text: '#92400e' },   // amber
+  { fill: '#f0fdf4', stroke: '#22c55e', text: '#166534' },   // green
+  { fill: '#faf5ff', stroke: '#a855f7', text: '#6b21a8' },   // purple
+  { fill: '#fef2f2', stroke: '#ef4444', text: '#991b1b' },   // red
+  { fill: '#ecfeff', stroke: '#06b6d4', text: '#155e75' },   // cyan
+  { fill: '#fdf2f8', stroke: '#ec4899', text: '#9d174d' },   // pink
+  { fill: '#f7fee7', stroke: '#84cc16', text: '#3f6212' },   // lime
+];
 
-interface TreeNode {
-  label: string;
-  children: TreeNode[];
-  x: number;
-  y: number;
-  w: number;
-}
-
-function measureNodeWidth(label: string): number {
-  return label.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2;
-}
-
-function buildTree(data: KnowledgeMapData): TreeNode {
-  const root: TreeNode = {
-    label: data.center,
-    children: data.topics.map(t => ({
-      label: t.label,
-      children: (t.children || []).map(c => ({ label: c, children: [], x: 0, y: 0, w: 0 })),
-      x: 0, y: 0, w: 0,
-    })),
-    x: 0, y: 0, w: 0,
-  };
-  return root;
-}
-
-function measureTree(node: TreeNode): number {
-  if (node.children.length === 0) {
-    node.w = measureNodeWidth(node.label);
-    return node.w;
-  }
-  let totalW = 0;
-  for (let i = 0; i < node.children.length; i++) {
-    totalW += measureTree(node.children[i]);
-    if (i < node.children.length - 1) totalW += SIBLING_GAP;
-  }
-  node.w = Math.max(measureNodeWidth(node.label), totalW);
-  return node.w;
-}
-
-function layoutTree(node: TreeNode, x: number, y: number): void {
-  node.y = y;
-  if (node.children.length === 0) {
-    node.x = x + (node.w - measureNodeWidth(node.label)) / 2;
-    return;
-  }
-  let totalChildW = 0;
-  for (let i = 0; i < node.children.length; i++) {
-    totalChildW += node.children[i].w;
-    if (i < node.children.length - 1) totalChildW += SIBLING_GAP;
-  }
-  let cx = x + (node.w - totalChildW) / 2;
-  for (const child of node.children) {
-    layoutTree(child, cx, y + LEVEL_GAP);
-    cx += child.w + SIBLING_GAP;
-  }
-  // Center parent over children
-  const firstChild = node.children[0];
-  const lastChild = node.children[node.children.length - 1];
-  const childrenCenter = (firstChild.x + firstChild.w / 2 + lastChild.x + lastChild.w / 2) / 2;
-  node.x = childrenCenter - measureNodeWidth(node.label) / 2;
-}
-
-function getMaxDimensions(node: TreeNode): { width: number; height: number } {
-  let maxW = node.x + node.w;
-  let maxH = node.y + NODE_H;
-  for (const child of node.children) {
-    const dims = getMaxDimensions(child);
-    maxW = Math.max(maxW, dims.width);
-    maxH = Math.max(maxH, dims.height);
-  }
-  return { width: maxW, height: maxH };
-}
+const ORBIT_R = 170;
+const SUB_ORBIT_R = 80;
+const CENTER_R = 48;
+const TOPIC_R = 36;
+const SUB_R = 24;
 
 export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
-  const root = buildTree(data);
-  measureTree(root);
-  layoutTree(root, SIDE_PAD, TOP_PAD);
-  const dims = getMaxDimensions(root);
-  const svgW = dims.width + SIDE_PAD;
-  const svgH = dims.height + TOP_PAD;
+  const svgSize = 620;
+  const cx = svgSize / 2;
+  const cy = svgSize / 2;
+  const topics = data.topics;
 
-  function renderNode(node: TreeNode, depth: number) {
-    const nw = measureNodeWidth(node.label);
-    const cx = node.x + nw / 2;
-    const cy = node.y + NODE_H / 2;
-    const isRoot = depth === 0;
+  const topicPositions = topics.map((topic, i) => {
+    const angle = (2 * Math.PI * i) / topics.length - Math.PI / 2;
+    const tx = cx + ORBIT_R * Math.cos(angle);
+    const ty = cy + ORBIT_R * Math.sin(angle);
+    const color = TOPIC_COLORS[i % TOPIC_COLORS.length];
 
-    return (
-      <g key={`${node.label}-${node.x}`}>
-        {/* Connections to children */}
-        {node.children.map((child, i) => {
-          const ccx = child.x + measureNodeWidth(child.label) / 2;
-          const ccy = child.y;
-          const midY = cy + (ccy - cy) / 2;
-          return (
-            <g key={i}>
-              <path
-                d={`M${cx},${cy + NODE_H / 2} L${cx},${midY} L${ccx},${midY} L${ccx},${ccy}`}
-                stroke="#94a3b8" strokeWidth={1} fill="none"
-              />
-            </g>
-          );
-        })}
+    const childCount = (topic.children || []).length;
+    const children = (topic.children || []).map((child, j) => {
+      const spreadAngle = childCount <= 1 ? 0 : (j - (childCount - 1) / 2) * 0.45;
+      const childAngle = angle + spreadAngle;
+      const sx = tx + SUB_ORBIT_R * Math.cos(childAngle);
+      const sy = ty + SUB_ORBIT_R * Math.sin(childAngle);
+      return { label: child, x: sx, y: sy, color };
+    });
 
-        {/* Node frame */}
-        <rect
-          x={node.x} y={node.y}
-          width={nw} height={NODE_H}
-          rx={4}
-          fill={isRoot ? '#3b82f6' : 'transparent'}
-          fillOpacity={isRoot ? 0.06 : 0}
-          stroke={isRoot ? '#3b82f6' : '#94a3b8'}
-          strokeWidth={1}
-        />
-
-        {/* Label */}
-        <text
-          x={cx} y={cy}
-          textAnchor="middle" dominantBaseline="middle"
-          fill={isRoot ? '#3b82f6' : '#334155'}
-          fontSize={FONT_SIZE} fontWeight={isRoot ? 700 : 500}
-        >
-          {node.label}
-        </text>
-
-        {/* Recurse children */}
-        {node.children.map((child, i) => renderNode(child, depth + 1))}
-      </g>
-    );
-  }
+    return { label: topic.label, x: tx, y: ty, color, children, angle };
+  });
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
-      {renderNode(root, 0)}
+    <svg viewBox={`0 0 ${svgSize} ${svgSize}`} fill="none" className="w-full" style={{ maxHeight: 620 }}>
+      <defs>
+        {/* Center gradient */}
+        <linearGradient id="km-center-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#6366f1" />
+          <stop offset="100%" stopColor="#8b5cf6" />
+        </linearGradient>
+
+        {/* Glow filter for center */}
+        <filter id="km-center-glow" x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="8" result="blur" />
+          <feFlood floodColor="#6366f1" floodOpacity="0.2" result="color" />
+          <feComposite in="color" in2="blur" operator="in" result="glow" />
+          <feMerge>
+            <feMergeNode in="glow" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        {/* Node shadow */}
+        <filter id="km-node-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000" floodOpacity="0.08" />
+        </filter>
+
+        {/* Sub-node shadow */}
+        <filter id="km-sub-shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.06" />
+        </filter>
+
+        {/* Orbit ring gradient */}
+        <radialGradient id="km-ring-glow" cx="50%" cy="50%" r="50%">
+          <stop offset="60%" stopColor="#6366f1" stopOpacity="0" />
+          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.04" />
+        </radialGradient>
+
+        {/* Per-topic gradients */}
+        {TOPIC_COLORS.map((c, i) => (
+          <linearGradient key={i} id={`km-topic-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor={c.fill} />
+            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.5" />
+          </linearGradient>
+        ))}
+      </defs>
+
+      {/* Background glow */}
+      <circle cx={cx} cy={cy} r={ORBIT_R + TOPIC_R + 50} fill="url(#km-ring-glow)" />
+
+      {/* Orbit ring */}
+      <circle cx={cx} cy={cy} r={ORBIT_R} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="3 6" fill="none" opacity="0.5" />
+
+      {/* Connection lines: center → topics */}
+      {topicPositions.map((tp, i) => (
+        <line key={`cl-${i}`} x1={cx} y1={cy} x2={tp.x} y2={tp.y}
+          stroke={tp.color.stroke} strokeWidth="1.5" strokeOpacity="0.25" />
+      ))}
+
+      {/* Connection lines: topics → children */}
+      {topicPositions.map((tp, i) =>
+        tp.children.map((child, j) => (
+          <line key={`tl-${i}-${j}`} x1={tp.x} y1={tp.y} x2={child.x} y2={child.y}
+            stroke={tp.color.stroke} strokeWidth="1" strokeOpacity="0.2" />
+        ))
+      )}
+
+      {/* Child nodes */}
+      {topicPositions.map((tp, i) =>
+        tp.children.map((child, j) => (
+          <g key={`cn-${i}-${j}`}>
+            <circle cx={child.x} cy={child.y} r={SUB_R}
+              fill="#ffffff" stroke={tp.color.stroke} strokeWidth="1"
+              filter="url(#km-sub-shadow)"
+            />
+            <text x={child.x} y={child.y + 1} textAnchor="middle" dominantBaseline="middle"
+              fill={tp.color.text} fontSize="8" fontWeight="600">
+              {child.label.length > 12 ? child.label.slice(0, 11) + '…' : child.label}
+            </text>
+          </g>
+        ))
+      )}
+
+      {/* Topic nodes */}
+      {topicPositions.map((tp, i) => (
+        <g key={`tn-${i}`}>
+          <circle cx={tp.x} cy={tp.y} r={TOPIC_R}
+            fill={tp.color.fill} stroke={tp.color.stroke} strokeWidth="1.5"
+            filter="url(#km-node-shadow)"
+          />
+          <text x={tp.x} y={tp.y + 1} textAnchor="middle" dominantBaseline="middle"
+            fill={tp.color.text} fontSize="10" fontWeight="700">
+            {tp.label.length > 10 ? tp.label.slice(0, 9) + '…' : tp.label}
+          </text>
+        </g>
+      ))}
+
+      {/* Center node */}
+      <circle cx={cx} cy={cy} r={CENTER_R}
+        fill="url(#km-center-grad)" stroke="#a5b4fc" strokeWidth="2"
+        filter="url(#km-center-glow)"
+      />
+      <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
+        fill="#ffffff" fontSize="13" fontWeight="800">
+        {data.center}
+      </text>
     </svg>
   );
 }
