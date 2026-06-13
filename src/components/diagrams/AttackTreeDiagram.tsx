@@ -2,82 +2,131 @@
 
 import { AttackTreeData } from '@/types';
 
-const BRANCH_COLORS = ['#3b82f6', '#8b5cf6', '#f59e0b', '#10b981', '#ef4444', '#06b6d4'];
-const ITEM_H = 30;
-const ITEM_GAP = 6;
-const ITEM_PAD = 12;
-const BRANCH_HEADER_H = 36;
+const NODE_PAD_X = 16;
+const NODE_PAD_Y = 6;
+const NODE_H = 30;
+const BRANCH_H = 28;
+const FONT_SIZE = 11;
+const BRANCH_FONT = 11;
+const ITEM_FONT = 11;
+const LEVEL_GAP = 44;
 const BRANCH_GAP = 20;
-const SIDE_PAD = 40;
+const SIDE_PAD = 24;
+const TOP_PAD = 16;
 
 export function AttackTreeDiagram({ data }: { data: AttackTreeData }) {
   const branches = data.branches;
-  const maxItems = Math.max(...branches.map(b => b.items.length));
-  const branchW = 180;
-  const contentH = maxItems * (ITEM_H + ITEM_GAP) - ITEM_GAP;
-  const branchH = BRANCH_HEADER_H + contentH + ITEM_PAD;
-  const svgW = SIDE_PAD + branches.length * (branchW + BRANCH_GAP) - BRANCH_GAP + SIDE_PAD;
-  const svgH = 60 + BRANCH_HEADER_H + 20 + branchH + 30;
+
+  // Measure branch widths
+  const branchWidths = branches.map(b => {
+    const labelW = b.label.length * BRANCH_FONT * 0.6 + NODE_PAD_X * 2;
+    const maxItemW = Math.max(...b.items.map(item => item.length * ITEM_FONT * 0.6 + NODE_PAD_X * 2 + 16));
+    return Math.max(labelW, maxItemW);
+  });
+
+  const totalW = branchWidths.reduce((s, w) => s + w, 0) + (branches.length - 1) * BRANCH_GAP;
+  const svgW = totalW + SIDE_PAD * 2;
+
+  // Root node
+  const rootW = data.root.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2;
+  const rootH = NODE_H + NODE_PAD_Y * 2;
   const rootCx = svgW / 2;
+  const rootY = TOP_PAD;
+
+  // Branches start
+  const branchStartY = rootY + rootH + LEVEL_GAP;
+  const maxItems = Math.max(...branches.map(b => b.items.length));
+
+  const svgH = branchStartY + BRANCH_H + 12 + maxItems * (NODE_H + 8) + TOP_PAD;
+
+  // Calculate branch X positions (centered)
+  let bx = (svgW - totalW) / 2;
+  const branchPositions = branchWidths.map((w, i) => {
+    const x = bx;
+    bx += w + BRANCH_GAP;
+    return { x, w };
+  });
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
-      <defs>
-        <filter id="at-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodOpacity={0.06} />
-        </filter>
-      </defs>
-
+    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
       {/* Root node */}
-      <rect x={rootCx - 140} y={16} width={280} height={44} rx={22}
-        fill="#ef4444" fillOpacity={0.1} stroke="#ef4444" strokeWidth={2} filter="url(#at-shadow)" />
-      <text x={rootCx} y={42} textAnchor="middle" fill="#ef4444" fontSize={15} fontWeight={800} dominantBaseline="middle">
+      <rect
+        x={rootCx - rootW / 2} y={rootY}
+        width={rootW} height={rootH}
+        rx={4}
+        fill="#ef4444" fillOpacity={0.06}
+        stroke="#ef4444" strokeWidth={1}
+      />
+      <text
+        x={rootCx} y={rootY + rootH / 2}
+        textAnchor="middle" dominantBaseline="middle"
+        fill="#ef4444" fontSize={FONT_SIZE} fontWeight={700}
+      >
         {data.root}
       </text>
 
       {/* Branches */}
       {branches.map((branch, i) => {
-        const bx = SIDE_PAD + i * (branchW + BRANCH_GAP);
-        const by = 90;
-        const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
-        const branchCx = bx + branchW / 2;
-
-        // Center items vertically within the branch
-        const itemsCount = branch.items.length;
-        const itemsTotalH = itemsCount * ITEM_H + (itemsCount - 1) * ITEM_GAP;
-        const availableH = maxItems * ITEM_H + (maxItems - 1) * ITEM_GAP;
-        const offsetY = (availableH - itemsTotalH) / 2;
+        const bp = branchPositions[i];
+        const bcx = bp.x + bp.w / 2;
 
         return (
           <g key={i}>
-            {/* Connection from root */}
-            <path d={`M${rootCx},${60} C${rootCx},${75} ${branchCx},${75} ${branchCx},${by}`}
-              stroke={color} strokeWidth={1.5} strokeOpacity={0.5} fill="none" />
-
-            {/* Branch container */}
-            <rect x={bx} y={by} width={branchW} height={branchH} rx={12}
-              fill={color} fillOpacity={0.03} stroke={color} strokeWidth={1} strokeDasharray="4,2" />
+            {/* Line from root to branch */}
+            <path
+              d={`M${rootCx},${rootY + rootH} L${rootCx},${rootY + rootH + LEVEL_GAP / 2} L${bcx},${rootY + rootH + LEVEL_GAP / 2} L${bcx},${branchStartY}`}
+              stroke="#94a3b8" strokeWidth={1} fill="none"
+            />
 
             {/* Branch header */}
-            <rect x={bx + 8} y={by + 8} width={branchW - 16} height={BRANCH_HEADER_H - 16} rx={8}
-              fill={color} fillOpacity={0.12} />
-            <text x={branchCx} y={by + BRANCH_HEADER_H / 2 + 2} textAnchor="middle" fill={color} fontSize={12} fontWeight={700} dominantBaseline="middle">
+            <rect
+              x={bp.x} y={branchStartY}
+              width={bp.w} height={BRANCH_H}
+              rx={4}
+              fill="#3b82f6" fillOpacity={0.06}
+              stroke="#3b82f6" strokeWidth={1}
+            />
+            <text
+              x={bcx} y={branchStartY + BRANCH_H / 2}
+              textAnchor="middle" dominantBaseline="middle"
+              fill="#3b82f6" fontSize={BRANCH_FONT} fontWeight={600}
+            >
               {branch.label}
             </text>
 
-            {/* Items — vertically centered */}
+            {/* Items */}
             {branch.items.map((item, j) => {
-              const iy = by + BRANCH_HEADER_H + ITEM_PAD / 2 + offsetY + j * (ITEM_H + ITEM_GAP) + ITEM_H / 2;
+              const iy = branchStartY + BRANCH_H + 12 + j * (NODE_H + 8);
               return (
                 <g key={j}>
+                  {/* Vertical connector */}
                   {j > 0 && (
-                    <line x1={branchCx} y1={iy - ITEM_H / 2 - ITEM_GAP / 2} x2={branchCx} y2={iy - ITEM_H / 2}
-                      stroke={color} strokeWidth={1} strokeOpacity={0.3} />
+                    <line
+                      x1={bcx} y1={iy - 8} x2={bcx} y2={iy}
+                      stroke="#94a3b8" strokeWidth={1}
+                    />
                   )}
-                  <rect x={bx + 12} y={iy - ITEM_H / 2 + 2} width={branchW - 24} height={ITEM_H - 4} rx={8}
-                    fill={color} fillOpacity={0.06} stroke={color} strokeWidth={1} />
-                  <rect x={bx + 18} y={iy - 4} width={3} height={8} rx={1.5} fill={color} />
-                  <text x={bx + 30} y={iy + 2} fill={color} fontSize={11} fontWeight={600} dominantBaseline="middle">
+                  {/* Horizontal stub + vertical from branch */}
+                  {j === 0 && (
+                    <line
+                      x1={bcx} y1={branchStartY + BRANCH_H} x2={bcx} y2={iy}
+                      stroke="#94a3b8" strokeWidth={1}
+                    />
+                  )}
+
+                  {/* Item node */}
+                  <rect
+                    x={bp.x + 8} y={iy}
+                    width={bp.w - 16} height={NODE_H}
+                    rx={4}
+                    fill="transparent"
+                    stroke="#94a3b8" strokeWidth={1}
+                  />
+                  <text
+                    x={bcx} y={iy + NODE_H / 2}
+                    textAnchor="middle" dominantBaseline="middle"
+                    fill="#334155" fontSize={ITEM_FONT}
+                  >
                     {item}
                   </text>
                 </g>

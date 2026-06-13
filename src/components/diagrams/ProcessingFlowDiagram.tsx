@@ -2,131 +2,101 @@
 
 import { ProcessingFlowDiagramData } from '@/types';
 
-const ROLE_STYLES: Record<string, { bg: string; border: string; text: string; shape: 'rect' | 'pill' | 'diamond' }> = {
-  input:    { bg: '#3b82f6', border: '#3b82f6', text: '#3b82f6', shape: 'pill' },
-  process:  { bg: '#f59e0b', border: '#f59e0b', text: '#f59e0b', shape: 'rect' },
-  decision: { bg: '#8b5cf6', border: '#8b5cf6', text: '#8b5cf6', shape: 'diamond' },
-  output:   { bg: '#64748b', border: '#64748b', text: '#64748b', shape: 'rect' },
-  danger:   { bg: '#ef4444', border: '#ef4444', text: '#ef4444', shape: 'rect' },
-  success:  { bg: '#10b981', border: '#10b981', text: '#10b981', shape: 'pill' },
-  warning:  { bg: '#f59e0b', border: '#f59e0b', text: '#f59e0b', shape: 'rect' },
-  neutral:  { bg: '#64748b', border: '#64748b', text: '#64748b', shape: 'rect' },
-};
+const NODE_PAD_X = 16;
+const NODE_PAD_Y = 8;
+const NODE_H = 32;
+const FONT_SIZE = 12;
+const DETAIL_SIZE = 9;
+const STEP_GAP = 32;
+const SIDE_PAD = 48;
 
-const NODE_H = 48;
-const NODE_W = 260;
-const GAP = 18;
-const SIDE_PAD = 60;
+function measureStepWidth(step: { label: string; detail?: string; branchLabel?: string }): number {
+  const labelW = step.label.length * FONT_SIZE * 0.6;
+  const detailW = step.detail ? step.detail.length * DETAIL_SIZE * 0.55 : 0;
+  const branchW = step.branchLabel ? step.branchLabel.length * 9 * 0.6 + 16 : 0;
+  return Math.max(labelW, detailW) + NODE_PAD_X * 2 + branchW;
+}
 
 export function ProcessingFlowDiagram({ data }: { data: ProcessingFlowDiagramData }) {
   const steps = data.steps;
-  const svgW = NODE_W + SIDE_PAD * 2;
-  const svgH = 24 + steps.length * (NODE_H + GAP) - GAP + 24;
+  const maxW = Math.max(...steps.map(measureStepWidth));
+  const svgW = maxW + SIDE_PAD * 2;
   const cx = svgW / 2;
+  const svgH = 16 + steps.length * (NODE_H + STEP_GAP) - STEP_GAP + 16;
 
   function stepY(i: number) {
-    return 24 + i * (NODE_H + GAP) + NODE_H / 2;
+    return 16 + i * (NODE_H + STEP_GAP) + NODE_H / 2;
   }
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
-      <defs>
-        <filter id="pf-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation={3} floodOpacity={0.06} />
-        </filter>
-        <marker id="pf-arrow" viewBox="0 0 8 10" refX={4} refY={10} markerWidth={6} markerHeight={8} orient="auto">
-          <path d="M0,0 L4,10 L8,0" fill="#94a3b8" />
-        </marker>
-      </defs>
-
-      {/* Vertical centerline (subtle) */}
-      <line x1={cx} y1={24} x2={cx} y2={svgH - 24} stroke="#e2e8f0" strokeWidth={1} strokeOpacity={0.4} />
-
+    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
       {steps.map((step, i) => {
-        const style = ROLE_STYLES[step.role] || ROLE_STYLES.neutral;
         const y = stepY(i);
         const prevY = i > 0 ? stepY(i - 1) : null;
-        const isDiamond = style.shape === 'diamond';
-        const isPill = style.shape === 'pill';
+        const hasDetail = !!step.detail;
+        const nh = hasDetail ? NODE_H + 14 : NODE_H;
+        const isInput = step.role === 'input';
+        const isDanger = step.role === 'danger';
+        const isDecision = step.role === 'decision';
+        const isSuccess = step.role === 'success';
+
+        // Determine border color
+        let borderColor = '#94a3b8';
+        let textColor = '#334155';
+        let bgColor = 'transparent';
+        let bgOpacity = 0;
+        if (isInput) { borderColor = '#3b82f6'; textColor = '#3b82f6'; bgColor = '#3b82f6'; bgOpacity = 0.04; }
+        if (isDanger) { borderColor = '#ef4444'; textColor = '#ef4444'; bgColor = '#ef4444'; bgOpacity = 0.04; }
+        if (isSuccess) { borderColor = '#10b981'; textColor = '#10b981'; bgColor = '#10b981'; bgOpacity = 0.04; }
+        if (isDecision) { borderColor = '#8b5cf6'; textColor = '#8b5cf6'; bgColor = '#8b5cf6'; bgOpacity = 0.04; }
+
+        const sw = measureStepWidth(step);
+        const isPill = isInput || isSuccess;
+        const rx = isPill ? nh / 2 : 4;
 
         return (
           <g key={i}>
-            {/* Connector line */}
+            {/* Connector */}
             {prevY !== null && (
-              <line x1={cx} y1={prevY + NODE_H / 2 + 2} x2={cx} y2={y - NODE_H / 2 - 2}
-                stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#pf-arrow)" />
+              <line x1={cx} y1={prevY + (step.detail ? NODE_H + 14 : NODE_H) / 2 + 2} x2={cx} y2={y - nh / 2 - 2}
+                stroke="#94a3b8" strokeWidth={1} />
             )}
 
-            {/* Branch label on the side — centered vertically with the node */}
+            {/* Branch label */}
             {step.branchLabel && (
               <g>
-                <rect x={cx + NODE_W / 2 + 8} y={y - 10} width={100} height={20} rx={10}
-                  fill={style.bg} fillOpacity={0.08} stroke={style.border} strokeWidth={1} />
-                <text x={cx + NODE_W / 2 + 58} y={y + 2} textAnchor="middle" fill={style.border} fontSize={9} fontWeight={600} dominantBaseline="middle">
+                <text
+                  x={cx + sw / 2 + 8} y={y + 1}
+                  fill={borderColor} fontSize={9} fontWeight={500} dominantBaseline="middle"
+                >
                   {step.branchLabel}
                 </text>
-                <line x1={cx + NODE_W / 2} y1={y} x2={cx + NODE_W / 2 + 8} y2={y}
-                  stroke={style.border} strokeWidth={1} strokeOpacity={0.5} />
               </g>
             )}
 
-            {/* Diamond shape */}
-            {isDiamond && (
-              <g>
-                <polygon
-                  points={`${cx},${y - NODE_H / 2} ${cx + NODE_W / 2},${y} ${cx},${y + NODE_H / 2} ${cx - NODE_W / 2},${y}`}
-                  fill={style.bg} fillOpacity={0.06}
-                  stroke={style.border} strokeWidth={1.5}
-                  filter="url(#pf-shadow)"
-                />
-                <text x={cx} y={y - 4} textAnchor="middle" fill={style.text} fontSize={13} fontWeight={700} dominantBaseline="middle">
-                  {step.label}
-                </text>
-                {step.detail && (
-                  <text x={cx} y={y + 12} textAnchor="middle" fill="#64748b" fontSize={10} dominantBaseline="middle">
-                    {step.detail}
-                  </text>
-                )}
-              </g>
-            )}
+            {/* Node */}
+            <rect
+              x={cx - sw / 2} y={y - nh / 2}
+              width={sw} height={nh}
+              rx={rx}
+              fill={bgColor} fillOpacity={bgOpacity}
+              stroke={borderColor} strokeWidth={1}
+            />
 
-            {/* Pill shape */}
-            {isPill && (
-              <g>
-                <rect x={cx - NODE_W / 2} y={y - NODE_H / 2} width={NODE_W} height={NODE_H} rx={NODE_H / 2}
-                  fill={style.bg} fillOpacity={0.1}
-                  stroke={style.border} strokeWidth={2}
-                  filter="url(#pf-shadow)"
-                />
-                <text x={cx} y={y - 4} textAnchor="middle" fill={style.text} fontSize={13} fontWeight={700} dominantBaseline="middle">
-                  {step.label}
-                </text>
-                {step.detail && (
-                  <text x={cx} y={y + 12} textAnchor="middle" fill="#64748b" fontSize={10} dominantBaseline="middle">
-                    {step.detail}
-                  </text>
-                )}
-              </g>
-            )}
+            {/* Label */}
+            <text
+              x={cx} y={hasDetail ? y - 4 : y}
+              textAnchor="middle" dominantBaseline="middle"
+              fill={textColor} fontSize={FONT_SIZE} fontWeight={isInput || isDanger ? 600 : 500}
+            >
+              {step.label}
+            </text>
 
-            {/* Regular rectangle */}
-            {!isDiamond && !isPill && (
-              <g>
-                <rect x={cx - NODE_W / 2} y={y - NODE_H / 2} width={NODE_W} height={NODE_H} rx={12}
-                  fill={style.bg} fillOpacity={0.06}
-                  stroke={style.border} strokeWidth={1.5}
-                  filter="url(#pf-shadow)"
-                />
-                <rect x={cx - NODE_W / 2 + 8} y={y - 8} width={4} height={16} rx={2} fill={style.border} />
-                <text x={cx - NODE_W / 2 + 22} y={y - 2} fill={style.text} fontSize={13} fontWeight={700} dominantBaseline="middle">
-                  {step.label}
-                </text>
-                {step.detail && (
-                  <text x={cx - NODE_W / 2 + 22} y={y + 14} fill="#64748b" fontSize={10} dominantBaseline="middle">
-                    {step.detail}
-                  </text>
-                )}
-              </g>
+            {/* Detail */}
+            {step.detail && (
+              <text x={cx} y={y + 12} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" fontSize={DETAIL_SIZE}>
+                {step.detail}
+              </text>
             )}
           </g>
         );

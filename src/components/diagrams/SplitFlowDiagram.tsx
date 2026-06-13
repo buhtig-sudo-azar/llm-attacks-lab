@@ -2,183 +2,211 @@
 
 import { SplitFlowDiagramData, SplitFlowStep } from '@/types';
 
-const ROLE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
-  input:    { bg: '#3b82f6', border: '#3b82f6', text: '#fff' },
-  process:  { bg: '#f59e0b', border: '#f59e0b', text: '#fff' },
-  decision: { bg: '#8b5cf6', border: '#8b5cf6', text: '#fff' },
-  output:   { bg: '#64748b', border: '#64748b', text: '#fff' },
-  danger:   { bg: '#ef4444', border: '#ef4444', text: '#fff' },
-  success:  { bg: '#10b981', border: '#10b981', text: '#fff' },
-  warning:  { bg: '#f59e0b', border: '#f59e0b', text: '#fff' },
-  neutral:  { bg: '#64748b', border: '#64748b', text: '#fff' },
-};
+const NODE_PAD_X = 16;
+const NODE_PAD_Y = 8;
+const NODE_H = 32;
+const FONT_SIZE = 12;
+const DETAIL_SIZE = 9;
+const STEP_GAP = 36;
+const BRANCH_GAP = 48;
+const HEADER_H = 30;
+const SIDE_PAD = 24;
+const TOP_PAD = 16;
 
-const STEP_H = 52;
-const STEP_GAP = 14;
-const BRANCH_GAP = 40;
-const HEADER_H = 48;
-const INPUT_H = 56;
-const CONCLUSION_H = 60;
-const SIDE_PAD = 32;
-const TOP_PAD = 24;
+function measureStepWidth(step: SplitFlowStep): number {
+  const labelW = step.label.length * FONT_SIZE * 0.6;
+  const detailW = step.detail ? step.detail.length * DETAIL_SIZE * 0.55 : 0;
+  return Math.max(labelW, detailW) + NODE_PAD_X * 2;
+}
 
 export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
-  const maxSteps = Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length);
-  const leftW = 280;
-  const rightW = 280;
+  // Measure widths
+  const leftW = Math.max(
+    data.leftBranch.label.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2,
+    ...data.leftBranch.steps.map(measureStepWidth)
+  );
+  const rightW = Math.max(
+    data.rightBranch.label.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2,
+    ...data.rightBranch.steps.map(measureStepWidth)
+  );
+
+  const inputW = Math.max(
+    data.input.label.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2,
+    data.input.url ? data.input.url.length * DETAIL_SIZE * 0.55 + NODE_PAD_X * 2 : 0
+  );
+
   const svgW = SIDE_PAD + leftW + BRANCH_GAP + rightW + SIDE_PAD;
-  const branchContentH = maxSteps * (STEP_H + STEP_GAP) - STEP_GAP;
-  const branchH = HEADER_H + branchContentH + 16;
-  const svgH = TOP_PAD + INPUT_H + 40 + branchH + 30 + (data.conclusion ? CONCLUSION_H + 10 : 0) + 16;
+  const leftCx = SIDE_PAD + leftW / 2;
+  const rightCx = SIDE_PAD + leftW + BRANCH_GAP + rightW / 2;
+  const inputCx = svgW / 2;
 
-  const leftX = SIDE_PAD;
-  const rightX = SIDE_PAD + leftW + BRANCH_GAP;
-  const inputX = svgW / 2;
-  const inputY = TOP_PAD + INPUT_H / 2;
-  const branchStartY = TOP_PAD + INPUT_H + 40;
-  const splitY = branchStartY - 10;
+  // Heights
+  const inputH = data.input.url ? NODE_H + 16 : NODE_H + NODE_PAD_Y * 2;
+  const maxSteps = Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length);
+  const branchH = HEADER_H + 8 + maxSteps * (NODE_H + STEP_GAP) - STEP_GAP + NODE_PAD_Y;
 
-  const leftCx = leftX + leftW / 2;
-  const rightCx = rightX + rightW / 2;
+  const svgH = TOP_PAD + inputH + STEP_GAP + branchH + (data.conclusion ? STEP_GAP + NODE_H * 3 + 16 : 0) + TOP_PAD;
 
-  function stepY(index: number, stepsCount: number) {
-    // Center steps vertically within the branch content area
-    const stepsTotalH = stepsCount * STEP_H + (stepsCount - 1) * STEP_GAP;
-    const availableH = maxSteps * STEP_H + (maxSteps - 1) * STEP_GAP;
-    const offsetY = (availableH - stepsTotalH) / 2;
-    return branchStartY + HEADER_H + 16 + offsetY + index * (STEP_H + STEP_GAP) + STEP_H / 2;
+  function leftStepY(i: number) {
+    return TOP_PAD + inputH + STEP_GAP + HEADER_H + 8 + i * (NODE_H + STEP_GAP) + NODE_H / 2;
+  }
+  function rightStepY(i: number) {
+    return leftStepY(i);
   }
 
-  function StepNode({ step, cx, y, w }: { step: SplitFlowStep; cx: number; y: number; w: number }) {
-    const colors = ROLE_COLORS[step.role] || ROLE_COLORS.neutral;
+  function StepNode({ step, cx, y }: { step: SplitFlowStep; cx: number; y: number }) {
+    const w = measureStepWidth(step);
+    const hasDetail = !!step.detail;
+    const nh = hasDetail ? NODE_H + 14 : NODE_H;
     return (
       <g>
-        <rect x={cx - w / 2} y={y - STEP_H / 2} width={w} height={STEP_H} rx={12}
-          fill={colors.bg} fillOpacity={0.08} stroke={colors.border} strokeWidth={1.5} />
-        <rect x={cx - w / 2 + 8} y={y - 8} width={4} height={16} rx={2} fill={colors.border} />
-        <text x={cx - w / 2 + 22} y={y - 4} fill={colors.border} fontSize={13} fontWeight={700} dominantBaseline="middle">{step.label}</text>
+        <rect
+          x={cx - w / 2} y={y - nh / 2}
+          width={w} height={nh}
+          rx={4}
+          fill="transparent"
+          stroke="#94a3b8" strokeWidth={1}
+        />
+        <text
+          x={cx} y={hasDetail ? y - 4 : y}
+          textAnchor="middle" dominantBaseline="middle"
+          fill="#334155" fontSize={FONT_SIZE} fontWeight={500}
+        >
+          {step.label}
+        </text>
         {step.detail && (
-          <text x={cx - w / 2 + 22} y={y + 14} fill="#64748b" fontSize={10} dominantBaseline="middle">{step.detail}</text>
+          <text x={cx} y={y + 12} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" fontSize={DETAIL_SIZE}>
+            {step.detail}
+          </text>
         )}
       </g>
     );
   }
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
-      <defs>
-        <filter id="sf-shadow">
-          <feDropShadow dx="0" dy="2" stdDeviation={4} floodOpacity={0.08} />
-        </filter>
-        <marker id="sf-arrow-left" viewBox="0 0 10 8" refX={10} refY={4} markerWidth={8} markerHeight={6} orient="auto">
-          <path d="M0,0 L10,4 L0,8" fill="#f59e0b" />
-        </marker>
-        <marker id="sf-arrow-right" viewBox="0 0 10 8" refX={10} refY={4} markerWidth={8} markerHeight={6} orient="auto">
-          <path d="M0,0 L10,4 L0,8" fill="#10b981" />
-        </marker>
-      </defs>
-
-      {/* Input URL node */}
-      <rect x={inputX - 160} y={TOP_PAD} width={320} height={INPUT_H} rx={28}
-        fill="#3b82f6" fillOpacity={0.1} stroke="#3b82f6" strokeWidth={2} filter="url(#sf-shadow)" />
-      <text x={inputX} y={inputY - 6} textAnchor="middle" fill="#3b82f6" fontSize={14} fontWeight={800} dominantBaseline="middle">
+    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
+      {/* Input node */}
+      <rect
+        x={inputCx - inputW / 2} y={TOP_PAD}
+        width={inputW} height={inputH}
+        rx={4}
+        fill="#3b82f6" fillOpacity={0.06}
+        stroke="#3b82f6" strokeWidth={1}
+      />
+      <text
+        x={inputCx} y={TOP_PAD + inputH / 2 - (data.input.url ? 6 : 0)}
+        textAnchor="middle" dominantBaseline="middle"
+        fill="#3b82f6" fontSize={FONT_SIZE} fontWeight={600}
+      >
         {data.input.label}
       </text>
       {data.input.url && (
-        <text x={inputX} y={inputY + 14} textAnchor="middle" fill="#64748b" fontSize={12} fontFamily="monospace" dominantBaseline="middle">
+        <text x={inputCx} y={TOP_PAD + inputH / 2 + 8} textAnchor="middle" dominantBaseline="middle" fill="#94a3b8" fontSize={DETAIL_SIZE} fontFamily="monospace">
           {data.input.url}
         </text>
       )}
 
-      {/* Split lines from input to branches */}
-      <path d={`M${inputX},${TOP_PAD + INPUT_H} L${inputX},${splitY}`}
-        stroke="#94a3b8" strokeWidth={1.5} strokeDasharray="4,3" />
-      <path d={`M${inputX},${splitY} L${leftCx},${splitY} L${leftCx},${branchStartY}`}
-        stroke="#f59e0b" strokeWidth={1.5} markerEnd="url(#sf-arrow-left)" />
-      <path d={`M${inputX},${splitY} L${rightCx},${splitY} L${rightCx},${branchStartY}`}
-        stroke="#10b981" strokeWidth={1.5} markerEnd="url(#sf-arrow-right)" />
+      {/* Split lines */}
+      <line x1={inputCx} y1={TOP_PAD + inputH} x2={inputCx} y2={TOP_PAD + inputH + STEP_GAP / 2} stroke="#94a3b8" strokeWidth={1} />
+      <line x1={leftCx} y1={TOP_PAD + inputH + STEP_GAP / 2} x2={rightCx} y2={TOP_PAD + inputH + STEP_GAP / 2} stroke="#94a3b8" strokeWidth={1} />
+      <line x1={leftCx} y1={TOP_PAD + inputH + STEP_GAP / 2} x2={leftCx} y2={TOP_PAD + inputH + STEP_GAP} stroke="#94a3b8" strokeWidth={1} />
+      <line x1={rightCx} y1={TOP_PAD + inputH + STEP_GAP / 2} x2={rightCx} y2={TOP_PAD + inputH + STEP_GAP} stroke="#94a3b8" strokeWidth={1} />
 
-      {/* Left branch container */}
-      <rect x={leftX} y={branchStartY} width={leftW} height={branchH} rx={16}
-        fill="#f59e0b" fillOpacity={0.03} stroke="#f59e0b" strokeWidth={1} strokeDasharray="6,3" />
-      <rect x={leftX + 12} y={branchStartY + 8} width={leftW - 24} height={HEADER_H - 16} rx={10}
-        fill="#f59e0b" fillOpacity={0.12} />
-      <text x={leftCx} y={branchStartY + HEADER_H / 2 + 2} textAnchor="middle" fill="#f59e0b" fontSize={14} fontWeight={800} dominantBaseline="middle">
+      {/* Left branch header */}
+      <rect
+        x={leftCx - leftW / 2} y={TOP_PAD + inputH + STEP_GAP}
+        width={leftW} height={HEADER_H}
+        rx={4}
+        fill="#f59e0b" fillOpacity={0.06}
+        stroke="#f59e0b" strokeWidth={1}
+      />
+      <text x={leftCx} y={TOP_PAD + inputH + STEP_GAP + HEADER_H / 2} textAnchor="middle" dominantBaseline="middle" fill="#f59e0b" fontSize={FONT_SIZE} fontWeight={600}>
         {data.leftBranch.label}
       </text>
       {data.leftBranch.subtitle && (
-        <text x={leftCx} y={branchStartY + HEADER_H / 2 + 18} textAnchor="middle" fill="#64748b" fontSize={9}>
+        <text x={leftCx} y={TOP_PAD + inputH + STEP_GAP + HEADER_H / 2 + 12} textAnchor="middle" fill="#94a3b8" fontSize={DETAIL_SIZE}>
           {data.leftBranch.subtitle}
         </text>
       )}
 
-      {/* Left steps — vertically centered */}
-      {data.leftBranch.steps.map((step, i) => (
-        <g key={i}>
-          {i > 0 && (
-            <line x1={leftCx} y1={stepY(i - 1, data.leftBranch.steps.length) + STEP_H / 2 + 2} x2={leftCx} y2={stepY(i, data.leftBranch.steps.length) - STEP_H / 2 - 2}
-              stroke="#f59e0b" strokeWidth={1} strokeOpacity={0.4} />
-          )}
-          <StepNode step={step} cx={leftCx} y={stepY(i, data.leftBranch.steps.length)} w={leftW - 32} />
-        </g>
-      ))}
-
-      {/* Right branch container */}
-      <rect x={rightX} y={branchStartY} width={rightW} height={branchH} rx={16}
-        fill="#10b981" fillOpacity={0.03} stroke="#10b981" strokeWidth={1} strokeDasharray="6,3" />
-      <rect x={rightX + 12} y={branchStartY + 8} width={rightW - 24} height={HEADER_H - 16} rx={10}
-        fill="#10b981" fillOpacity={0.12} />
-      <text x={rightCx} y={branchStartY + HEADER_H / 2 + 2} textAnchor="middle" fill="#10b981" fontSize={14} fontWeight={800} dominantBaseline="middle">
+      {/* Right branch header */}
+      <rect
+        x={rightCx - rightW / 2} y={TOP_PAD + inputH + STEP_GAP}
+        width={rightW} height={HEADER_H}
+        rx={4}
+        fill="#10b981" fillOpacity={0.06}
+        stroke="#10b981" strokeWidth={1}
+      />
+      <text x={rightCx} y={TOP_PAD + inputH + STEP_GAP + HEADER_H / 2} textAnchor="middle" dominantBaseline="middle" fill="#10b981" fontSize={FONT_SIZE} fontWeight={600}>
         {data.rightBranch.label}
       </text>
       {data.rightBranch.subtitle && (
-        <text x={rightCx} y={branchStartY + HEADER_H / 2 + 18} textAnchor="middle" fill="#64748b" fontSize={9}>
+        <text x={rightCx} y={TOP_PAD + inputH + STEP_GAP + HEADER_H / 2 + 12} textAnchor="middle" fill="#94a3b8" fontSize={DETAIL_SIZE}>
           {data.rightBranch.subtitle}
         </text>
       )}
 
-      {/* Right steps — vertically centered */}
+      {/* Left steps */}
+      {data.leftBranch.steps.map((step, i) => (
+        <g key={i}>
+          <line x1={leftCx} y1={leftStepY(i) - NODE_H / 2 - STEP_GAP / 2} x2={leftCx} y2={leftStepY(i) - NODE_H / 2} stroke="#94a3b8" strokeWidth={1} />
+          <StepNode step={step} cx={leftCx} y={leftStepY(i)} />
+        </g>
+      ))}
+
+      {/* Right steps */}
       {data.rightBranch.steps.map((step, i) => (
         <g key={i}>
-          {i > 0 && (
-            <line x1={rightCx} y1={stepY(i - 1, data.rightBranch.steps.length) + STEP_H / 2 + 2} x2={rightCx} y2={stepY(i, data.rightBranch.steps.length) - STEP_H / 2 - 2}
-              stroke="#10b981" strokeWidth={1} strokeOpacity={0.4} />
-          )}
-          <StepNode step={step} cx={rightCx} y={stepY(i, data.rightBranch.steps.length)} w={rightW - 32} />
+          <line x1={rightCx} y1={rightStepY(i) - NODE_H / 2 - STEP_GAP / 2} x2={rightCx} y2={rightStepY(i) - NODE_H / 2} stroke="#94a3b8" strokeWidth={1} />
+          <StepNode step={step} cx={rightCx} y={rightStepY(i)} />
         </g>
       ))}
 
       {/* Conclusion */}
       {data.conclusion && (() => {
-        const cy = branchStartY + branchH + 30 + CONCLUSION_H / 2;
+        const concY = TOP_PAD + inputH + STEP_GAP + branchH + STEP_GAP;
+        const leftResultW = data.conclusion.left.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2;
+        const rightResultW = data.conclusion.right.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2;
+
         return (
           <g>
-            {/* Lines from branches down to conclusion */}
-            <path d={`M${leftCx},${branchStartY + branchH} L${leftCx},${branchStartY + branchH + 14} L${inputX - 130},${branchStartY + branchH + 14} L${inputX - 130},${cy - CONCLUSION_H / 2 + 8}`}
-              stroke="#f59e0b" strokeWidth={1} strokeOpacity={0.5} />
-            <path d={`M${rightCx},${branchStartY + branchH} L${rightCx},${branchStartY + branchH + 14} L${inputX + 130},${branchStartY + branchH + 14} L${inputX + 130},${cy - CONCLUSION_H / 2 + 8}`}
-              stroke="#10b981" strokeWidth={1} strokeOpacity={0.5} />
+            {/* Lines from branches */}
+            <line x1={leftCx} y1={TOP_PAD + inputH + STEP_GAP + branchH} x2={leftCx} y2={concY + NODE_H / 2} stroke="#f59e0b" strokeWidth={1} strokeOpacity={0.5} />
+            <line x1={rightCx} y1={TOP_PAD + inputH + STEP_GAP + branchH} x2={rightCx} y2={concY + NODE_H / 2} stroke="#10b981" strokeWidth={1} strokeOpacity={0.5} />
 
             {/* Left result */}
-            <rect x={inputX - 230} y={cy - 22} width={190} height={44} rx={10}
-              fill="#f59e0b" fillOpacity={0.1} stroke="#f59e0b" strokeWidth={1} />
-            <text x={inputX - 135} y={cy - 2} textAnchor="middle" fill="#f59e0b" fontSize={11} fontWeight={700} dominantBaseline="middle">
+            <rect x={leftCx - leftResultW / 2} y={concY} width={leftResultW} height={NODE_H} rx={4}
+              fill="#f59e0b" fillOpacity={0.06} stroke="#f59e0b" strokeWidth={1} />
+            <text x={leftCx} y={concY + NODE_H / 2} textAnchor="middle" dominantBaseline="middle" fill="#f59e0b" fontSize={FONT_SIZE} fontWeight={600}>
               {data.conclusion.left}
             </text>
 
             {/* Right result */}
-            <rect x={inputX + 40} y={cy - 22} width={190} height={44} rx={10}
-              fill="#10b981" fillOpacity={0.1} stroke="#10b981" strokeWidth={1} />
-            <text x={inputX + 135} y={cy - 2} textAnchor="middle" fill="#10b981" fontSize={11} fontWeight={700} dominantBaseline="middle">
+            <rect x={rightCx - rightResultW / 2} y={concY} width={rightResultW} height={NODE_H} rx={4}
+              fill="#10b981" fillOpacity={0.06} stroke="#10b981" strokeWidth={1} />
+            <text x={rightCx} y={concY + NODE_H / 2} textAnchor="middle" dominantBaseline="middle" fill="#10b981" fontSize={FONT_SIZE} fontWeight={600}>
               {data.conclusion.right}
             </text>
 
-            {/* Highlight / Danger badge — centered */}
-            <rect x={inputX - 110} y={cy + CONCLUSION_H / 2 - 10} width={220} height={32} rx={16}
-              fill="#ef4444" fillOpacity={0.1} stroke="#ef4444" strokeWidth={1.5} />
-            <text x={inputX} y={cy + CONCLUSION_H / 2 + 6} textAnchor="middle" fill="#ef4444" fontSize={12} fontWeight={800} dominantBaseline="middle">
-              {data.conclusion.highlight}
-            </text>
+            {/* Highlight */}
+            <line x1={leftCx} y1={concY + NODE_H} x2={leftCx} y2={concY + NODE_H + STEP_GAP / 2} stroke="#94a3b8" strokeWidth={1} />
+            <line x1={rightCx} y1={concY + NODE_H} x2={rightCx} y2={concY + NODE_H + STEP_GAP / 2} stroke="#94a3b8" strokeWidth={1} />
+            <line x1={leftCx} y1={concY + NODE_H + STEP_GAP / 2} x2={rightCx} y2={concY + NODE_H + STEP_GAP / 2} stroke="#94a3b8" strokeWidth={1} />
+            <line x1={inputCx} y1={concY + NODE_H + STEP_GAP / 2} x2={inputCx} y2={concY + NODE_H + STEP_GAP} stroke="#94a3b8" strokeWidth={1} />
+
+            {data.conclusion.highlight && (() => {
+              const hlW = data.conclusion.highlight.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2;
+              const hlY = concY + NODE_H + STEP_GAP;
+              return (
+                <g>
+                  <rect x={inputCx - hlW / 2} y={hlY} width={hlW} height={NODE_H} rx={4}
+                    fill="#ef4444" fillOpacity={0.06} stroke="#ef4444" strokeWidth={1} />
+                  <text x={inputCx} y={hlY + NODE_H / 2} textAnchor="middle" dominantBaseline="middle" fill="#ef4444" fontSize={FONT_SIZE} fontWeight={700}>
+                    {data.conclusion.highlight}
+                  </text>
+                </g>
+              );
+            })()}
           </g>
         );
       })()}

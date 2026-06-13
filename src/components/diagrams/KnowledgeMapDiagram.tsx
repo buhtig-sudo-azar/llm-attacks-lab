@@ -2,108 +2,150 @@
 
 import { KnowledgeMapData } from '@/types';
 
-const TOPIC_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+const NODE_PAD_X = 16;
+const NODE_PAD_Y = 8;
+const NODE_H = 32;
+const FONT_SIZE = 12;
+const LEVEL_GAP = 48;
+const SIBLING_GAP = 20;
+const INDENT = 24;
+const SIDE_PAD = 20;
+const TOP_PAD = 16;
 
-const CENTER_R = 44;
-const TOPIC_R = 34;
-const SUB_R = 22;
-const ORBIT_RADIUS = 150;
-const SUB_ORBIT = 70;
+interface TreeNode {
+  label: string;
+  children: TreeNode[];
+  x: number;
+  y: number;
+  w: number;
+}
+
+function measureNodeWidth(label: string): number {
+  return label.length * FONT_SIZE * 0.6 + NODE_PAD_X * 2;
+}
+
+function buildTree(data: KnowledgeMapData): TreeNode {
+  const root: TreeNode = {
+    label: data.center,
+    children: data.topics.map(t => ({
+      label: t.label,
+      children: (t.children || []).map(c => ({ label: c, children: [], x: 0, y: 0, w: 0 })),
+      x: 0, y: 0, w: 0,
+    })),
+    x: 0, y: 0, w: 0,
+  };
+  return root;
+}
+
+function measureTree(node: TreeNode): number {
+  if (node.children.length === 0) {
+    node.w = measureNodeWidth(node.label);
+    return node.w;
+  }
+  let totalW = 0;
+  for (let i = 0; i < node.children.length; i++) {
+    totalW += measureTree(node.children[i]);
+    if (i < node.children.length - 1) totalW += SIBLING_GAP;
+  }
+  node.w = Math.max(measureNodeWidth(node.label), totalW);
+  return node.w;
+}
+
+function layoutTree(node: TreeNode, x: number, y: number): void {
+  node.y = y;
+  if (node.children.length === 0) {
+    node.x = x + (node.w - measureNodeWidth(node.label)) / 2;
+    return;
+  }
+  let totalChildW = 0;
+  for (let i = 0; i < node.children.length; i++) {
+    totalChildW += node.children[i].w;
+    if (i < node.children.length - 1) totalChildW += SIBLING_GAP;
+  }
+  let cx = x + (node.w - totalChildW) / 2;
+  for (const child of node.children) {
+    layoutTree(child, cx, y + LEVEL_GAP);
+    cx += child.w + SIBLING_GAP;
+  }
+  // Center parent over children
+  const firstChild = node.children[0];
+  const lastChild = node.children[node.children.length - 1];
+  const childrenCenter = (firstChild.x + firstChild.w / 2 + lastChild.x + lastChild.w / 2) / 2;
+  node.x = childrenCenter - measureNodeWidth(node.label) / 2;
+}
+
+function getMaxDimensions(node: TreeNode): { width: number; height: number } {
+  let maxW = node.x + node.w;
+  let maxH = node.y + NODE_H;
+  for (const child of node.children) {
+    const dims = getMaxDimensions(child);
+    maxW = Math.max(maxW, dims.width);
+    maxH = Math.max(maxH, dims.height);
+  }
+  return { width: maxW, height: maxH };
+}
 
 export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
-  const topics = data.topics;
-  const svgSize = 580;
-  const cx = svgSize / 2;
-  const cy = svgSize / 2;
+  const root = buildTree(data);
+  measureTree(root);
+  layoutTree(root, SIDE_PAD, TOP_PAD);
+  const dims = getMaxDimensions(root);
+  const svgW = dims.width + SIDE_PAD;
+  const svgH = dims.height + TOP_PAD;
 
-  // Distribute topics evenly around center
-  const topicPositions = topics.map((topic, i) => {
-    const angle = (2 * Math.PI * i) / topics.length - Math.PI / 2;
-    const tx = cx + ORBIT_RADIUS * Math.cos(angle);
-    const ty = cy + ORBIT_RADIUS * Math.sin(angle);
-    const color = TOPIC_COLORS[i % TOPIC_COLORS.length];
+  function renderNode(node: TreeNode, depth: number) {
+    const nw = measureNodeWidth(node.label);
+    const cx = node.x + nw / 2;
+    const cy = node.y + NODE_H / 2;
+    const isRoot = depth === 0;
 
-    // Distribute children symmetrically around the topic
-    const childCount = (topic.children || []).length;
-    const children = (topic.children || []).map((child, j) => {
-      // Symmetric spread: center children around the radial direction
-      const spreadAngle = childCount <= 1 ? 0 : (j - (childCount - 1) / 2) * 0.5;
-      const childAngle = angle + spreadAngle;
-      const sx = tx + SUB_ORBIT * Math.cos(childAngle);
-      const sy = ty + SUB_ORBIT * Math.sin(childAngle);
-      return { label: child, x: sx, y: sy, color };
-    });
+    return (
+      <g key={`${node.label}-${node.x}`}>
+        {/* Connections to children */}
+        {node.children.map((child, i) => {
+          const ccx = child.x + measureNodeWidth(child.label) / 2;
+          const ccy = child.y;
+          const midY = cy + (ccy - cy) / 2;
+          return (
+            <g key={i}>
+              <path
+                d={`M${cx},${cy + NODE_H / 2} L${cx},${midY} L${ccx},${midY} L${ccx},${ccy}`}
+                stroke="#94a3b8" strokeWidth={1} fill="none"
+              />
+            </g>
+          );
+        })}
 
-    return { label: topic.label, x: tx, y: ty, color, children, angle };
-  });
+        {/* Node frame */}
+        <rect
+          x={node.x} y={node.y}
+          width={nw} height={NODE_H}
+          rx={4}
+          fill={isRoot ? '#3b82f6' : 'transparent'}
+          fillOpacity={isRoot ? 0.06 : 0}
+          stroke={isRoot ? '#3b82f6' : '#94a3b8'}
+          strokeWidth={1}
+        />
+
+        {/* Label */}
+        <text
+          x={cx} y={cy}
+          textAnchor="middle" dominantBaseline="middle"
+          fill={isRoot ? '#3b82f6' : '#334155'}
+          fontSize={FONT_SIZE} fontWeight={isRoot ? 700 : 500}
+        >
+          {node.label}
+        </text>
+
+        {/* Recurse children */}
+        {node.children.map((child, i) => renderNode(child, depth + 1))}
+      </g>
+    );
+  }
 
   return (
-    <svg viewBox={`0 0 ${svgSize} ${svgSize}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
-      <defs>
-        <filter id="km-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation={3} floodOpacity={0.08} />
-        </filter>
-        <radialGradient id="km-center-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.12} />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity={0} />
-        </radialGradient>
-      </defs>
-
-      {/* Background glow — perfectly centered circle */}
-      <circle cx={cx} cy={cy} r={ORBIT_RADIUS + TOPIC_R + 40} fill="url(#km-center-glow)" />
-
-      {/* Orbit ring (subtle) */}
-      <circle cx={cx} cy={cy} r={ORBIT_RADIUS} stroke="#e2e8f0" strokeWidth={1} strokeDasharray="4,4" fill="none" strokeOpacity={0.3} />
-
-      {/* Connection lines from center to topics */}
-      {topicPositions.map((tp, i) => (
-        <line key={`line-${i}`} x1={cx} y1={cy} x2={tp.x} y2={tp.y}
-          stroke={tp.color} strokeWidth={1.5} strokeOpacity={0.3} />
-      ))}
-
-      {/* Connection lines from topics to children */}
-      {topicPositions.map((tp, i) =>
-        tp.children.map((child, j) => (
-          <line key={`child-line-${i}-${j}`} x1={tp.x} y1={tp.y} x2={child.x} y2={child.y}
-            stroke={tp.color} strokeWidth={1} strokeOpacity={0.25} />
-        ))
-      )}
-
-      {/* Child nodes */}
-      {topicPositions.map((tp, i) =>
-        tp.children.map((child, j) => (
-          <g key={`child-${i}-${j}`}>
-            <circle cx={child.x} cy={child.y} r={SUB_R}
-              fill={tp.color} fillOpacity={0.08}
-              stroke={tp.color} strokeWidth={1} />
-            <text x={child.x} y={child.y + 1} textAnchor="middle" fill={tp.color} fontSize={8} fontWeight={600} dominantBaseline="middle">
-              {child.label.length > 14 ? child.label.slice(0, 13) + '…' : child.label}
-            </text>
-          </g>
-        ))
-      )}
-
-      {/* Topic nodes */}
-      {topicPositions.map((tp, i) => (
-        <g key={`topic-${i}`}>
-          <circle cx={tp.x} cy={tp.y} r={TOPIC_R}
-            fill={tp.color} fillOpacity={0.1}
-            stroke={tp.color} strokeWidth={1.5}
-            filter="url(#km-shadow)" />
-          <text x={tp.x} y={tp.y + 1} textAnchor="middle" fill={tp.color} fontSize={10} fontWeight={700} dominantBaseline="middle">
-            {tp.label.length > 12 ? tp.label.slice(0, 11) + '…' : tp.label}
-          </text>
-        </g>
-      ))}
-
-      {/* Center node — perfectly symmetric */}
-      <circle cx={cx} cy={cy} r={CENTER_R}
-        fill="#3b82f6" fillOpacity={0.12}
-        stroke="#3b82f6" strokeWidth={2}
-        filter="url(#km-shadow)" />
-      <text x={cx} y={cy + 1} textAnchor="middle" fill="#3b82f6" fontSize={12} fontWeight={800} dominantBaseline="middle">
-        {data.center}
-      </text>
+    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
+      {renderNode(root, 0)}
     </svg>
   );
 }

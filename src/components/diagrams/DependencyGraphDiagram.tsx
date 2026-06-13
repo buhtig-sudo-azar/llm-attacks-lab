@@ -2,13 +2,15 @@
 
 import { DependencyNode, DependencyGraphData } from '@/types';
 
-const LEVEL_COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444'];
-
-const NODE_H = 40;
-const NODE_W = 180;
-const H_GAP = 16;
-const V_GAP = 56;
-const SIDE_PAD = 40;
+const NODE_PAD_X = 16;
+const NODE_PAD_Y = 8;
+const NODE_H = 34;
+const FONT_SIZE = 12;
+const DETAIL_SIZE = 9;
+const LEVEL_GAP = 52;
+const SIBLING_GAP = 16;
+const SIDE_PAD = 20;
+const TOP_PAD = 16;
 
 interface LayoutNode {
   x: number;
@@ -16,59 +18,68 @@ interface LayoutNode {
   w: number;
   label: string;
   detail?: string;
-  color: string;
   children: LayoutNode[];
-  subtreeW: number;
+}
+
+function measureNodeWidth(label: string, detail?: string): number {
+  const labelW = label.length * FONT_SIZE * 0.6;
+  const detailW = detail ? detail.length * DETAIL_SIZE * 0.55 : 0;
+  return Math.max(labelW, detailW) + NODE_PAD_X * 2;
 }
 
 function measureSubtreeWidth(node: DependencyNode, depth: number): number {
-  if (!node.children || node.children.length === 0) {
-    return NODE_W;
+  const nw = measureNodeWidth(node.label, node.detail);
+  if (!node.children || node.children.length === 0) return nw;
+
+  let totalW = 0;
+  for (let i = 0; i < node.children.length; i++) {
+    totalW += measureSubtreeWidth(node.children[i], depth + 1);
+    if (i < node.children.length - 1) totalW += SIBLING_GAP;
   }
-  const childrenWidth = node.children.reduce(
-    (sum, child) => sum + measureSubtreeWidth(child, depth + 1) + H_GAP,
-    -H_GAP
-  );
-  return Math.max(NODE_W, childrenWidth);
+  return Math.max(nw, totalW);
 }
 
 function layoutTree(node: DependencyNode, x: number, y: number, depth: number): LayoutNode {
-  const color = LEVEL_COLORS[depth % LEVEL_COLORS.length];
   const subtreeW = measureSubtreeWidth(node, depth);
+  const nw = measureNodeWidth(node.label, node.detail);
 
   if (!node.children || node.children.length === 0) {
-    // Center leaf node within its allocated subtree width
-    const nodeX = x + (subtreeW - NODE_W) / 2;
-    return { x: nodeX, y, w: NODE_W, label: node.label, detail: node.detail, color, children: [], subtreeW };
+    return {
+      x: x + (subtreeW - nw) / 2,
+      y,
+      w: nw,
+      label: node.label,
+      detail: node.detail,
+      children: [],
+    };
   }
 
+  let totalChildW = 0;
   const childWidths = node.children.map(c => measureSubtreeWidth(c, depth + 1));
-  const totalChildrenWidth = childWidths.reduce((s, w) => s + w, 0) + (node.children.length - 1) * H_GAP;
-  const startX = x + (subtreeW - totalChildrenWidth) / 2;
+  for (let i = 0; i < childWidths.length; i++) {
+    totalChildW += childWidths[i];
+    if (i < childWidths.length - 1) totalChildW += SIBLING_GAP;
+  }
 
-  let childX = startX;
+  let childX = x + (subtreeW - totalChildW) / 2;
   const children: LayoutNode[] = [];
   for (let i = 0; i < node.children.length; i++) {
-    const cw = childWidths[i];
-    children.push(layoutTree(node.children[i], childX, y + NODE_H + V_GAP, depth + 1));
-    childX += cw + H_GAP;
+    children.push(layoutTree(node.children[i], childX, y + NODE_H + LEVEL_GAP, depth + 1));
+    childX += childWidths[i] + SIBLING_GAP;
   }
 
-  // Center parent node over its children
+  // Center parent over children
   const firstChild = children[0];
   const lastChild = children[children.length - 1];
-  const childrenCenterX = (firstChild.x + firstChild.w / 2 + lastChild.x + lastChild.w / 2) / 2;
-  const nodeX = childrenCenterX - NODE_W / 2;
+  const childrenCenter = (firstChild.x + firstChild.w / 2 + lastChild.x + lastChild.w / 2) / 2;
 
   return {
-    x: nodeX,
+    x: childrenCenter - nw / 2,
     y,
-    w: NODE_W,
+    w: nw,
     label: node.label,
     detail: node.detail,
-    color,
     children,
-    subtreeW,
   };
 }
 
@@ -83,62 +94,77 @@ function getMaxDimensions(node: LayoutNode): { width: number; height: number } {
   return { width: maxW, height: maxH };
 }
 
-function TreeNode({ node }: { node: LayoutNode }) {
+function TreeNode({ node, depth }: { node: LayoutNode; depth: number }) {
   const cx = node.x + node.w / 2;
   const cy = node.y + NODE_H / 2;
+  const isRoot = depth === 0;
+  const hasDetail = !!node.detail;
+  const nodeH = hasDetail ? NODE_H + 14 : NODE_H;
 
   return (
     <g>
-      {/* Curved lines to children */}
+      {/* Lines to children */}
       {node.children.map((child, i) => {
-        const childCx = child.x + child.w / 2;
-        const childCy = child.y + NODE_H / 2;
-        const midY = cy + (childCy - cy) / 2;
+        const ccx = child.x + child.w / 2;
+        const ccy = child.y;
+        const midY = cy + nodeH / 2 + (ccy - cy - nodeH / 2) / 2;
         return (
           <path key={i}
-            d={`M${cx},${cy + NODE_H / 2} C${cx},${midY} ${childCx},${midY} ${childCx},${child.y}`}
-            stroke={child.color} strokeWidth={1.5} strokeOpacity={0.4} fill="none"
+            d={`M${cx},${cy + nodeH / 2} L${cx},${midY} L${ccx},${midY} L${ccx},${ccy}`}
+            stroke="#94a3b8" strokeWidth={1} fill="none"
           />
         );
       })}
 
-      {/* Node box */}
-      <rect x={node.x} y={node.y} width={node.w} height={NODE_H} rx={10}
-        fill={node.color} fillOpacity={0.08}
-        stroke={node.color} strokeWidth={1.5}
+      {/* Frame */}
+      <rect
+        x={node.x} y={node.y}
+        width={node.w} height={nodeH}
+        rx={4}
+        fill={isRoot ? '#3b82f6' : 'transparent'}
+        fillOpacity={isRoot ? 0.06 : 0}
+        stroke={isRoot ? '#3b82f6' : '#94a3b8'}
+        strokeWidth={1}
       />
-      <rect x={node.x + 6} y={node.y + NODE_H / 2 - 6} width={3} height={12} rx={1.5} fill={node.color} />
-      <text x={node.x + 18} y={cy - 2} fill={node.color} fontSize={12} fontWeight={700} dominantBaseline="middle">
+
+      {/* Label */}
+      <text
+        x={cx} y={hasDetail ? cy - 4 : cy}
+        textAnchor="middle" dominantBaseline="middle"
+        fill={isRoot ? '#3b82f6' : '#334155'}
+        fontSize={FONT_SIZE} fontWeight={isRoot ? 700 : 500}
+      >
         {node.label}
       </text>
+
+      {/* Detail */}
       {node.detail && (
-        <text x={node.x + 18} y={cy + 12} fill="#64748b" fontSize={9} dominantBaseline="middle">
+        <text
+          x={cx} y={cy + 12}
+          textAnchor="middle" dominantBaseline="middle"
+          fill="#94a3b8" fontSize={DETAIL_SIZE}
+        >
           {node.detail}
         </text>
       )}
 
       {/* Children */}
       {node.children.map((child, i) => (
-        <TreeNode key={i} node={child} />
+        <TreeNode key={i} node={child} depth={depth + 1} />
       ))}
     </g>
   );
 }
 
 export function DependencyGraphDiagram({ data }: { data: DependencyGraphData }) {
-  const root = layoutTree(data.root, SIDE_PAD, 24, 0);
+  const root = layoutTree(data.root, SIDE_PAD, TOP_PAD, 0);
   const dims = getMaxDimensions(root);
   const svgW = dims.width + SIDE_PAD;
-  const svgH = dims.height + 24;
+  const svgH = dims.height + TOP_PAD;
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
-      <defs>
-        <filter id="dg-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation={2} floodOpacity={0.06} />
-        </filter>
-      </defs>
-      <TreeNode node={root} />
+    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
+      <TreeNode node={root} depth={0} />
     </svg>
   );
 }
