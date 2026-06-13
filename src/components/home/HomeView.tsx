@@ -51,7 +51,7 @@ export function HomeView() {
         <div className="absolute inset-0">
           <Image
             src="/hero-banner.png"
-            alt="Cache Deception Lab"
+            alt="LLM Attacks Lab"
             fill
             className="object-cover"
             priority

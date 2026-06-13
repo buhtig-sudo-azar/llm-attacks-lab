@@ -15,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Cache Deception Lab — Web Cache Deception",
-  description: "Интерактивная лаборатория для изучения Web Cache Deception: 9 модулей, ИИ-наставники, песочницы и геймификация по материалам PortSwigger",
-  keywords: ["WCD", "Web Cache Deception", "Cache Security", "Cache Poisoning", "PortSwigger", "Cybersecurity", "CDN", "Обучение"],
+  title: "LLM Attacks Lab — Атаки на языковые модели",
+  description: "Интерактивная лаборатория для изучения атак на LLM: prompt injection, эксплуатация API, небезопасная обработка вывода, отравление данных по материалам PortSwigger",
+  keywords: ["LLM", "Prompt Injection", "AI Security", "LLM Attacks", "PortSwigger", "Cybersecurity", "AI Safety", "Обучение"],
   icons: {
     icon: "/favicon.png",
   },

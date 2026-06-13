@@ -36,8 +36,8 @@ export function Header() {
 
       <div className="flex items-center gap-2 flex-1 min-w-0">
         <Shield className="h-5 w-5 text-primary shrink-0" />
-        <span className="font-bold text-base truncate">Cache Deception Lab</span>
-        <span className="text-xs text-muted-foreground hidden sm:inline">Web Cache Deception</span>
+        <span className="font-bold text-base truncate">LLM Attacks Lab</span>
+        <span className="text-xs text-muted-foreground hidden sm:inline">Атаки на языковые модели</span>
       </div>
 
       <div className="flex items-center gap-1.5 shrink-0">
