@@ -23,9 +23,12 @@ export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
     const ty = cy + ORBIT_RADIUS * Math.sin(angle);
     const color = TOPIC_COLORS[i % TOPIC_COLORS.length];
 
-    // Distribute children around the topic
+    // Distribute children symmetrically around the topic
+    const childCount = (topic.children || []).length;
     const children = (topic.children || []).map((child, j) => {
-      const childAngle = angle + ((j - (topic.children!.length - 1) / 2) * 0.6);
+      // Symmetric spread: center children around the radial direction
+      const spreadAngle = childCount <= 1 ? 0 : (j - (childCount - 1) / 2) * 0.5;
+      const childAngle = angle + spreadAngle;
       const sx = tx + SUB_ORBIT * Math.cos(childAngle);
       const sy = ty + SUB_ORBIT * Math.sin(childAngle);
       return { label: child, x: sx, y: sy, color };
@@ -38,7 +41,7 @@ export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
     <svg viewBox={`0 0 ${svgSize} ${svgSize}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
       <defs>
         <filter id="km-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodOpacity={0.08} />
+          <feDropShadow dx="0" dy="1" stdDeviation={3} floodOpacity={0.08} />
         </filter>
         <radialGradient id="km-center-glow" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.12} />
@@ -46,8 +49,11 @@ export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
         </radialGradient>
       </defs>
 
-      {/* Background glow */}
+      {/* Background glow — perfectly centered circle */}
       <circle cx={cx} cy={cy} r={ORBIT_RADIUS + TOPIC_R + 40} fill="url(#km-center-glow)" />
+
+      {/* Orbit ring (subtle) */}
+      <circle cx={cx} cy={cy} r={ORBIT_RADIUS} stroke="#e2e8f0" strokeWidth={1} strokeDasharray="4,4" fill="none" strokeOpacity={0.3} />
 
       {/* Connection lines from center to topics */}
       {topicPositions.map((tp, i) => (
@@ -90,7 +96,7 @@ export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
         </g>
       ))}
 
-      {/* Center node */}
+      {/* Center node — perfectly symmetric */}
       <circle cx={cx} cy={cy} r={CENTER_R}
         fill="#3b82f6" fillOpacity={0.12}
         stroke="#3b82f6" strokeWidth={2}

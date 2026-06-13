@@ -28,14 +28,14 @@ export function CauseEffectDiagram({ data }: { data: CauseEffectData }) {
     <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
       <defs>
         <filter id="ce-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodOpacity={0.06} />
+          <feDropShadow dx="0" dy="1" stdDeviation={3} floodOpacity={0.06} />
         </filter>
-        <marker id="ce-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto">
+        <marker id="ce-arrow" viewBox="0 0 10 10" refX={10} refY={5} markerWidth={8} markerHeight={8} orient="auto">
           <path d="M0,0 L10,5 L0,10 Z" fill="#94a3b8" />
         </marker>
       </defs>
 
-      {/* Vertical connecting line (background) */}
+      {/* Vertical centerline */}
       {steps.length > 1 && (
         <line x1={cx} y1={stepY(0) + NODE_H / 2} x2={cx} y2={stepY(steps.length - 1) - NODE_H / 2}
           stroke="#e2e8f0" strokeWidth={2} />
@@ -50,13 +50,11 @@ export function CauseEffectDiagram({ data }: { data: CauseEffectData }) {
           <g key={i}>
             {/* Arrow from previous */}
             {prevY !== null && (
-              <g>
-                <line x1={cx} y1={prevY + NODE_H / 2 + 2} x2={cx} y2={y - NODE_H / 2 - 8}
-                  stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#ce-arrow)" />
-              </g>
+              <line x1={cx} y1={prevY + NODE_H / 2 + 2} x2={cx} y2={y - NODE_H / 2 - 8}
+                stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#ce-arrow)" />
             )}
 
-            {/* Step node */}
+            {/* Step node — centered */}
             <rect x={cx - NODE_W / 2} y={y - NODE_H / 2} width={NODE_W} height={NODE_H} rx={12}
               fill={colors.bg} fillOpacity={0.06}
               stroke={colors.border} strokeWidth={2}
@@ -66,19 +64,19 @@ export function CauseEffectDiagram({ data }: { data: CauseEffectData }) {
             {/* Left accent bar */}
             <rect x={cx - NODE_W / 2 + 8} y={y - 10} width={4} height={20} rx={2} fill={colors.border} />
 
-            {/* Role badge */}
+            {/* Role badge — centered above label */}
             <rect x={cx - NODE_W / 2 + 20} y={y - NODE_H / 2 + 4} width={50} height={16} rx={8}
               fill={colors.bg} fillOpacity={0.15} />
             <text x={cx - NODE_W / 2 + 45} y={y - NODE_H / 2 + 13} textAnchor="middle" fill={colors.border} fontSize={8} fontWeight={700} dominantBaseline="middle">
               {step.role === 'cause' ? 'ПРИЧИНА' : step.role === 'effect' ? 'СЛЕДСТВИЕ' : 'УГРОЗА'}
             </text>
 
-            {/* Label */}
+            {/* Label — centered */}
             <text x={cx} y={y + 2} textAnchor="middle" fill={colors.text} fontSize={13} fontWeight={700} dominantBaseline="middle">
               {step.label}
             </text>
 
-            {/* Detail */}
+            {/* Detail — centered */}
             {step.detail && (
               <text x={cx} y={y + 18} textAnchor="middle" fill="#64748b" fontSize={10} dominantBaseline="middle">
                 {step.detail}

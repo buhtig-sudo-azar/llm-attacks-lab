@@ -42,6 +42,12 @@ export function AttackTreeDiagram({ data }: { data: AttackTreeData }) {
         const color = BRANCH_COLORS[i % BRANCH_COLORS.length];
         const branchCx = bx + branchW / 2;
 
+        // Center items vertically within the branch
+        const itemsCount = branch.items.length;
+        const itemsTotalH = itemsCount * ITEM_H + (itemsCount - 1) * ITEM_GAP;
+        const availableH = maxItems * ITEM_H + (maxItems - 1) * ITEM_GAP;
+        const offsetY = (availableH - itemsTotalH) / 2;
+
         return (
           <g key={i}>
             {/* Connection from root */}
@@ -59,9 +65,9 @@ export function AttackTreeDiagram({ data }: { data: AttackTreeData }) {
               {branch.label}
             </text>
 
-            {/* Items */}
+            {/* Items — vertically centered */}
             {branch.items.map((item, j) => {
-              const iy = by + BRANCH_HEADER_H + ITEM_PAD / 2 + j * (ITEM_H + ITEM_GAP) + ITEM_H / 2;
+              const iy = by + BRANCH_HEADER_H + ITEM_PAD / 2 + offsetY + j * (ITEM_H + ITEM_GAP) + ITEM_H / 2;
               return (
                 <g key={j}>
                   {j > 0 && (

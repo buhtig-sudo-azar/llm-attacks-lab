@@ -18,6 +18,7 @@ interface LayoutNode {
   detail?: string;
   color: string;
   children: LayoutNode[];
+  subtreeW: number;
 }
 
 function measureSubtreeWidth(node: DependencyNode, depth: number): number {
@@ -33,12 +34,17 @@ function measureSubtreeWidth(node: DependencyNode, depth: number): number {
 
 function layoutTree(node: DependencyNode, x: number, y: number, depth: number): LayoutNode {
   const color = LEVEL_COLORS[depth % LEVEL_COLORS.length];
+  const subtreeW = measureSubtreeWidth(node, depth);
+
   if (!node.children || node.children.length === 0) {
-    return { x, y, w: NODE_W, label: node.label, detail: node.detail, color, children: [] };
+    // Center leaf node within its allocated subtree width
+    const nodeX = x + (subtreeW - NODE_W) / 2;
+    return { x: nodeX, y, w: NODE_W, label: node.label, detail: node.detail, color, children: [], subtreeW };
   }
+
   const childWidths = node.children.map(c => measureSubtreeWidth(c, depth + 1));
-  const totalWidth = childWidths.reduce((s, w) => s + w, 0) + (node.children.length - 1) * H_GAP;
-  const startX = x + (Math.max(NODE_W, totalWidth) - totalWidth) / 2;
+  const totalChildrenWidth = childWidths.reduce((s, w) => s + w, 0) + (node.children.length - 1) * H_GAP;
+  const startX = x + (subtreeW - totalChildrenWidth) / 2;
 
   let childX = startX;
   const children: LayoutNode[] = [];
@@ -48,14 +54,21 @@ function layoutTree(node: DependencyNode, x: number, y: number, depth: number): 
     childX += cw + H_GAP;
   }
 
+  // Center parent node over its children
+  const firstChild = children[0];
+  const lastChild = children[children.length - 1];
+  const childrenCenterX = (firstChild.x + firstChild.w / 2 + lastChild.x + lastChild.w / 2) / 2;
+  const nodeX = childrenCenterX - NODE_W / 2;
+
   return {
-    x: x + (Math.max(NODE_W, totalWidth) - NODE_W) / 2,
+    x: nodeX,
     y,
     w: NODE_W,
     label: node.label,
     detail: node.detail,
     color,
     children,
+    subtreeW,
   };
 }
 
@@ -122,7 +135,7 @@ export function DependencyGraphDiagram({ data }: { data: DependencyGraphData }) 
     <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
       <defs>
         <filter id="dg-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" floodOpacity={0.06} />
+          <feDropShadow dx="0" dy="1" stdDeviation={2} floodOpacity={0.06} />
         </filter>
       </defs>
       <TreeNode node={root} />

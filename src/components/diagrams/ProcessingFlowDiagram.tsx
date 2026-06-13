@@ -32,12 +32,15 @@ export function ProcessingFlowDiagram({ data }: { data: ProcessingFlowDiagramDat
     <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
       <defs>
         <filter id="pf-shadow">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodOpacity={0.06} />
+          <feDropShadow dx="0" dy="1" stdDeviation={3} floodOpacity={0.06} />
         </filter>
-        <marker id="pf-arrow" viewBox="0 0 8 10" refX="4" refY="10" markerWidth="6" markerHeight="8" orient="auto">
+        <marker id="pf-arrow" viewBox="0 0 8 10" refX={4} refY={10} markerWidth={6} markerHeight={8} orient="auto">
           <path d="M0,0 L4,10 L8,0" fill="#94a3b8" />
         </marker>
       </defs>
+
+      {/* Vertical centerline (subtle) */}
+      <line x1={cx} y1={24} x2={cx} y2={svgH - 24} stroke="#e2e8f0" strokeWidth={1} strokeOpacity={0.4} />
 
       {steps.map((step, i) => {
         const style = ROLE_STYLES[step.role] || ROLE_STYLES.neutral;
@@ -54,7 +57,7 @@ export function ProcessingFlowDiagram({ data }: { data: ProcessingFlowDiagramDat
                 stroke="#94a3b8" strokeWidth={1.5} markerEnd="url(#pf-arrow)" />
             )}
 
-            {/* Branch label on the side */}
+            {/* Branch label on the side — centered vertically with the node */}
             {step.branchLabel && (
               <g>
                 <rect x={cx + NODE_W / 2 + 8} y={y - 10} width={100} height={20} rx={10}

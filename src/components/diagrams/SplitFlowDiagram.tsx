@@ -2,15 +2,15 @@
 
 import { SplitFlowDiagramData, SplitFlowStep } from '@/types';
 
-const ROLE_COLORS: Record<string, { bg: string; border: string; text: string; icon: string }> = {
-  input:    { bg: '#3b82f6', border: '#3b82f6', text: '#fff',    icon: '📥' },
-  process:  { bg: '#f59e0b', border: '#f59e0b', text: '#fff',    icon: '⚙️' },
-  decision: { bg: '#8b5cf6', border: '#8b5cf6', text: '#fff',    icon: '🔀' },
-  output:   { bg: '#64748b', border: '#64748b', text: '#fff',    icon: '📤' },
-  danger:   { bg: '#ef4444', border: '#ef4444', text: '#fff',    icon: '⚠️' },
-  success:  { bg: '#10b981', border: '#10b981', text: '#fff',    icon: '✅' },
-  warning:  { bg: '#f59e0b', border: '#f59e0b', text: '#fff',    icon: '⚡' },
-  neutral:  { bg: '#64748b', border: '#64748b', text: '#fff',    icon: '📄' },
+const ROLE_COLORS: Record<string, { bg: string; border: string; text: string }> = {
+  input:    { bg: '#3b82f6', border: '#3b82f6', text: '#fff' },
+  process:  { bg: '#f59e0b', border: '#f59e0b', text: '#fff' },
+  decision: { bg: '#8b5cf6', border: '#8b5cf6', text: '#fff' },
+  output:   { bg: '#64748b', border: '#64748b', text: '#fff' },
+  danger:   { bg: '#ef4444', border: '#ef4444', text: '#fff' },
+  success:  { bg: '#10b981', border: '#10b981', text: '#fff' },
+  warning:  { bg: '#f59e0b', border: '#f59e0b', text: '#fff' },
+  neutral:  { bg: '#64748b', border: '#64748b', text: '#fff' },
 };
 
 const STEP_H = 52;
@@ -41,8 +41,12 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
   const leftCx = leftX + leftW / 2;
   const rightCx = rightX + rightW / 2;
 
-  function stepY(index: number) {
-    return branchStartY + HEADER_H + 16 + index * (STEP_H + STEP_GAP) + STEP_H / 2;
+  function stepY(index: number, stepsCount: number) {
+    // Center steps vertically within the branch content area
+    const stepsTotalH = stepsCount * STEP_H + (stepsCount - 1) * STEP_GAP;
+    const availableH = maxSteps * STEP_H + (maxSteps - 1) * STEP_GAP;
+    const offsetY = (availableH - stepsTotalH) / 2;
+    return branchStartY + HEADER_H + 16 + offsetY + index * (STEP_H + STEP_GAP) + STEP_H / 2;
   }
 
   function StepNode({ step, cx, y, w }: { step: SplitFlowStep; cx: number; y: number; w: number }) {
@@ -60,31 +64,17 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
     );
   }
 
-  function VerticalDots({ x, fromY, toY }: { x: number; fromY: number; toY: number }) {
-    const mid = (fromY + toY) / 2;
-    return (
-      <g>
-        <circle cx={x} cy={mid - 8} r={2} fill="#94a3b8" />
-        <circle cx={x} cy={mid} r={2} fill="#94a3b8" />
-        <circle cx={x} cy={mid + 8} r={2} fill="#94a3b8" />
-      </g>
-    );
-  }
-
   return (
     <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 580 }}>
       <defs>
         <filter id="sf-shadow">
-          <feDropShadow dx="0" dy="2" stdDeviation="4" floodOpacity={0.08} />
+          <feDropShadow dx="0" dy="2" stdDeviation={4} floodOpacity={0.08} />
         </filter>
-        <marker id="sf-arrow-left" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <marker id="sf-arrow-left" viewBox="0 0 10 8" refX={10} refY={4} markerWidth={8} markerHeight={6} orient="auto">
           <path d="M0,0 L10,4 L0,8" fill="#f59e0b" />
         </marker>
-        <marker id="sf-arrow-right" viewBox="0 0 10 8" refX="10" refY="4" markerWidth="8" markerHeight="6" orient="auto">
+        <marker id="sf-arrow-right" viewBox="0 0 10 8" refX={10} refY={4} markerWidth={8} markerHeight={6} orient="auto">
           <path d="M0,0 L10,4 L0,8" fill="#10b981" />
-        </marker>
-        <marker id="sf-arrow-down" viewBox="0 0 8 10" refX="4" refY="10" markerWidth="6" markerHeight="8" orient="auto">
-          <path d="M0,0 L4,10 L8,0" fill="#94a3b8" />
         </marker>
       </defs>
 
@@ -122,14 +112,14 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
         </text>
       )}
 
-      {/* Left steps */}
+      {/* Left steps — vertically centered */}
       {data.leftBranch.steps.map((step, i) => (
         <g key={i}>
           {i > 0 && (
-            <line x1={leftCx} y1={stepY(i - 1) + STEP_H / 2 + 2} x2={leftCx} y2={stepY(i) - STEP_H / 2 - 2}
+            <line x1={leftCx} y1={stepY(i - 1, data.leftBranch.steps.length) + STEP_H / 2 + 2} x2={leftCx} y2={stepY(i, data.leftBranch.steps.length) - STEP_H / 2 - 2}
               stroke="#f59e0b" strokeWidth={1} strokeOpacity={0.4} />
           )}
-          <StepNode step={step} cx={leftCx} y={stepY(i)} w={leftW - 32} />
+          <StepNode step={step} cx={leftCx} y={stepY(i, data.leftBranch.steps.length)} w={leftW - 32} />
         </g>
       ))}
 
@@ -147,14 +137,14 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
         </text>
       )}
 
-      {/* Right steps */}
+      {/* Right steps — vertically centered */}
       {data.rightBranch.steps.map((step, i) => (
         <g key={i}>
           {i > 0 && (
-            <line x1={rightCx} y1={stepY(i - 1) + STEP_H / 2 + 2} x2={rightCx} y2={stepY(i) - STEP_H / 2 - 2}
+            <line x1={rightCx} y1={stepY(i - 1, data.rightBranch.steps.length) + STEP_H / 2 + 2} x2={rightCx} y2={stepY(i, data.rightBranch.steps.length) - STEP_H / 2 - 2}
               stroke="#10b981" strokeWidth={1} strokeOpacity={0.4} />
           )}
-          <StepNode step={step} cx={rightCx} y={stepY(i)} w={rightW - 32} />
+          <StepNode step={step} cx={rightCx} y={stepY(i, data.rightBranch.steps.length)} w={rightW - 32} />
         </g>
       ))}
 
@@ -183,7 +173,7 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
               {data.conclusion.right}
             </text>
 
-            {/* Highlight / Danger badge */}
+            {/* Highlight / Danger badge — centered */}
             <rect x={inputX - 110} y={cy + CONCLUSION_H / 2 - 10} width={220} height={32} rx={16}
               fill="#ef4444" fillOpacity={0.1} stroke="#ef4444" strokeWidth={1.5} />
             <text x={inputX} y={cy + CONCLUSION_H / 2 + 6} textAnchor="middle" fill="#ef4444" fontSize={12} fontWeight={800} dominantBaseline="middle">
