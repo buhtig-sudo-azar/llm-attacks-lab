@@ -1,152 +1,133 @@
 'use client';
 
 import { KnowledgeMapData } from '@/types';
+import { GraphDiagram, GraphNode, GraphLink, GraphLegend } from './GraphDiagram';
 
 const TOPIC_COLORS = [
-  { fill: '#eff6ff', stroke: '#3b82f6', text: '#1d4ed8' },   // blue
-  { fill: '#fffbeb', stroke: '#f59e0b', text: '#92400e' },   // amber
-  { fill: '#f0fdf4', stroke: '#22c55e', text: '#166534' },   // green
-  { fill: '#faf5ff', stroke: '#a855f7', text: '#6b21a8' },   // purple
-  { fill: '#fef2f2', stroke: '#ef4444', text: '#991b1b' },   // red
-  { fill: '#ecfeff', stroke: '#06b6d4', text: '#155e75' },   // cyan
-  { fill: '#fdf2f8', stroke: '#ec4899', text: '#9d174d' },   // pink
-  { fill: '#f7fee7', stroke: '#84cc16', text: '#3f6212' },   // lime
+  { stroke: '#3b82f6', label: 'Архитектура' },
+  { stroke: '#f59e0b', label: 'Интеграция' },
+  { stroke: '#22c55e', label: 'Защита' },
+  { stroke: '#a855f7', label: 'Атака' },
+  { stroke: '#ef4444', label: 'Уязвимость' },
+  { stroke: '#06b6d4', label: 'Данные' },
+  { stroke: '#ec4899', label: 'Модель' },
+  { stroke: '#84cc16', label: 'Мониторинг' },
 ];
 
-const ORBIT_R = 170;
-const SUB_ORBIT_R = 80;
-const CENTER_R = 48;
-const TOPIC_R = 36;
-const SUB_R = 24;
+const ROLE_SYMBOLS: Record<string, string> = {
+  center: '\u2295',   // ⊕
+  topic: '\u25C9',    // ◉
+  child: '\u25CB',    // ○
+};
 
 export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
-  const svgSize = 620;
-  const cx = svgSize / 2;
-  const cy = svgSize / 2;
   const topics = data.topics;
+  const cx = 440;
+  const cy = 340;
+  const ORBIT_R = 180;
+  const SUB_ORBIT_R = 85;
+  const CENTER_R = 40;
+  const TOPIC_R = 28;
+  const SUB_R = 20;
 
-  const topicPositions = topics.map((topic, i) => {
+  const PAD = 60;
+  const vbW = cx * 2 + PAD * 2;
+  const vbH = cy * 2 + PAD * 2;
+  const ox = -PAD + (cx - 440);
+  const oy = -PAD + (cy - 340);
+
+  const nodes: GraphNode[] = [];
+  const links: GraphLink[] = [];
+  const legend: GraphLegend[] = [];
+
+  // Center node
+  nodes.push({
+    id: 'center',
+    label: data.center,
+    x: cx,
+    y: cy,
+    symbol: ROLE_SYMBOLS.center,
+    color: '#6366f1',
+    role: 'Центр',
+    description: `Центральная тема: ${data.center}. Нажмите на связанные узлы, чтобы узнать подробности о каждом аспекте.`,
+    radius: CENTER_R,
+  });
+
+  // Topic nodes + children
+  topics.forEach((topic, i) => {
     const angle = (2 * Math.PI * i) / topics.length - Math.PI / 2;
     const tx = cx + ORBIT_R * Math.cos(angle);
     const ty = cy + ORBIT_R * Math.sin(angle);
-    const color = TOPIC_COLORS[i % TOPIC_COLORS.length];
+    const color = TOPIC_COLORS[i % TOPIC_COLORS.length].stroke;
 
-    const childCount = (topic.children || []).length;
-    const children = (topic.children || []).map((child, j) => {
-      const spreadAngle = childCount <= 1 ? 0 : (j - (childCount - 1) / 2) * 0.45;
-      const childAngle = angle + spreadAngle;
-      const sx = tx + SUB_ORBIT_R * Math.cos(childAngle);
-      const sy = ty + SUB_ORBIT_R * Math.sin(childAngle);
-      return { label: child, x: sx, y: sy, color };
+    // Clamp positions within viewBox
+    const clampedTx = Math.max(ox + TOPIC_R + 10, Math.min(ox + vbW - TOPIC_R - 10, tx));
+    const clampedTy = Math.max(oy + TOPIC_R + 10, Math.min(oy + vbH - TOPIC_R - 10, ty));
+
+    nodes.push({
+      id: `topic-${i}`,
+      label: topic.label,
+      x: clampedTx,
+      y: clampedTy,
+      symbol: ROLE_SYMBOLS.topic,
+      color,
+      role: 'Тема',
+      description: `Тема: ${topic.label}. Область знаний, связанная с центральной темой «${data.center}».`,
+      radius: TOPIC_R,
     });
 
-    return { label: topic.label, x: tx, y: ty, color, children, angle };
+    links.push({
+      from: 'center',
+      to: `topic-${i}`,
+      color,
+      animated: false,
+    });
+
+    // Legend entry
+    if (i < 6) {
+      legend.push({ color, label: topic.label.length > 12 ? topic.label.slice(0, 11) + '…' : topic.label });
+    }
+
+    // Children
+    const children = topic.children || [];
+    children.forEach((child, j) => {
+      const childCount = children.length;
+      const spreadAngle = childCount <= 1 ? 0 : (j - (childCount - 1) / 2) * 0.5;
+      const childAngle = angle + spreadAngle;
+      let sx = clampedTx + SUB_ORBIT_R * Math.cos(childAngle);
+      let sy = clampedTy + SUB_ORBIT_R * Math.sin(childAngle);
+
+      // Clamp within viewBox
+      sx = Math.max(ox + SUB_R + 10, Math.min(ox + vbW - SUB_R - 10, sx));
+      sy = Math.max(oy + SUB_R + 10, Math.min(oy + vbH - SUB_R - 10, sy));
+
+      nodes.push({
+        id: `child-${i}-${j}`,
+        label: child,
+        x: sx,
+        y: sy,
+        symbol: ROLE_SYMBOLS.child,
+        color,
+        role: 'Подтема',
+        description: `Подтема «${child}» в рамках темы «${topic.label}». Связана с центральной темой «${data.center}».`,
+        radius: SUB_R,
+      });
+
+      links.push({
+        from: `topic-${i}`,
+        to: `child-${i}-${j}`,
+        color,
+        animated: false,
+      });
+    });
   });
 
   return (
-    <svg viewBox={`0 0 ${svgSize} ${svgSize}`} fill="none" className="w-full" style={{ maxHeight: 620 }}>
-      <defs>
-        {/* Center gradient */}
-        <linearGradient id="km-center-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-
-        {/* Glow filter for center */}
-        <filter id="km-center-glow" x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="8" result="blur" />
-          <feFlood floodColor="#6366f1" floodOpacity="0.2" result="color" />
-          <feComposite in="color" in2="blur" operator="in" result="glow" />
-          <feMerge>
-            <feMergeNode in="glow" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-
-        {/* Node shadow */}
-        <filter id="km-node-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="2" stdDeviation="4" floodColor="#000" floodOpacity="0.08" />
-        </filter>
-
-        {/* Sub-node shadow */}
-        <filter id="km-sub-shadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="1" stdDeviation="2" floodColor="#000" floodOpacity="0.06" />
-        </filter>
-
-        {/* Orbit ring gradient */}
-        <radialGradient id="km-ring-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="60%" stopColor="#6366f1" stopOpacity="0" />
-          <stop offset="100%" stopColor="#6366f1" stopOpacity="0.04" />
-        </radialGradient>
-
-        {/* Per-topic gradients */}
-        {TOPIC_COLORS.map((c, i) => (
-          <linearGradient key={i} id={`km-topic-grad-${i}`} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor={c.fill} />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0.5" />
-          </linearGradient>
-        ))}
-      </defs>
-
-      {/* Background glow */}
-      <circle cx={cx} cy={cy} r={ORBIT_R + TOPIC_R + 50} fill="url(#km-ring-glow)" />
-
-      {/* Orbit ring */}
-      <circle cx={cx} cy={cy} r={ORBIT_R} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="3 6" fill="none" opacity="0.5" />
-
-      {/* Connection lines: center → topics */}
-      {topicPositions.map((tp, i) => (
-        <line key={`cl-${i}`} x1={cx} y1={cy} x2={tp.x} y2={tp.y}
-          stroke={tp.color.stroke} strokeWidth="1.5" strokeOpacity="0.25" />
-      ))}
-
-      {/* Connection lines: topics → children */}
-      {topicPositions.map((tp, i) =>
-        tp.children.map((child, j) => (
-          <line key={`tl-${i}-${j}`} x1={tp.x} y1={tp.y} x2={child.x} y2={child.y}
-            stroke={tp.color.stroke} strokeWidth="1" strokeOpacity="0.2" />
-        ))
-      )}
-
-      {/* Child nodes */}
-      {topicPositions.map((tp, i) =>
-        tp.children.map((child, j) => (
-          <g key={`cn-${i}-${j}`}>
-            <circle cx={child.x} cy={child.y} r={SUB_R}
-              fill="#ffffff" stroke={tp.color.stroke} strokeWidth="1"
-              filter="url(#km-sub-shadow)"
-            />
-            <text x={child.x} y={child.y + 1} textAnchor="middle" dominantBaseline="middle"
-              fill={tp.color.text} fontSize="8" fontWeight="600">
-              {child.label.length > 12 ? child.label.slice(0, 11) + '…' : child.label}
-            </text>
-          </g>
-        ))
-      )}
-
-      {/* Topic nodes */}
-      {topicPositions.map((tp, i) => (
-        <g key={`tn-${i}`}>
-          <circle cx={tp.x} cy={tp.y} r={TOPIC_R}
-            fill={tp.color.fill} stroke={tp.color.stroke} strokeWidth="1.5"
-            filter="url(#km-node-shadow)"
-          />
-          <text x={tp.x} y={tp.y + 1} textAnchor="middle" dominantBaseline="middle"
-            fill={tp.color.text} fontSize="10" fontWeight="700">
-            {tp.label.length > 10 ? tp.label.slice(0, 9) + '…' : tp.label}
-          </text>
-        </g>
-      ))}
-
-      {/* Center node */}
-      <circle cx={cx} cy={cy} r={CENTER_R}
-        fill="url(#km-center-grad)" stroke="#a5b4fc" strokeWidth="2"
-        filter="url(#km-center-glow)"
-      />
-      <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
-        fill="#ffffff" fontSize="13" fontWeight="800">
-        {data.center}
-      </text>
-    </svg>
+    <GraphDiagram
+      nodes={nodes}
+      links={links}
+      legend={legend}
+      viewBox={{ x: ox, y: oy, w: vbW, h: vbH }}
+    />
   );
 }

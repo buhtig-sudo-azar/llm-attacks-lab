@@ -1,194 +1,123 @@
 'use client';
 
 import { DependencyNode, DependencyGraphData } from '@/types';
+import { GraphDiagram, GraphNode, GraphLink, GraphLegend } from './GraphDiagram';
 
 const LEVEL_COLORS = [
-  { fill: '#eff6ff', stroke: '#3b82f6', text: '#1d4ed8', shadow: 'rgb(59 130 246 / 0.15)' },   // root blue
-  { fill: '#f8fafc', stroke: '#e2e8f0', text: '#334155', shadow: 'rgb(0 0 0 / 0.06)' },        // default
-  { fill: '#fffbeb', stroke: '#f59e0b', text: '#92400e', shadow: 'rgb(245 158 11 / 0.12)' },   // amber
-  { fill: '#f0fdf4', stroke: '#22c55e', text: '#166534', shadow: 'rgb(34 197 94 / 0.12)' },    // green
-  { fill: '#fef2f2', stroke: '#ef4444', text: '#991b1b', shadow: 'rgb(239 68 68 / 0.12)' },    // red
+  '#3b82f6', // root blue
+  '#64748b', // default
+  '#f59e0b', // amber
+  '#22c55e', // green
+  '#ef4444', // red
 ];
 
-const NODE_H = 44;
-const NODE_MIN_W = 160;
-const NODE_PAD_X = 20;
-const NODE_PAD_Y = 12;
-const H_GAP = 24;
-const V_GAP = 64;
-const SIDE_PAD = 32;
+const LEVEL_SYMBOLS = ['\u2295', '\u25CF', '\u25CB', '\u25A1', '\u25A1']; // ⊕ ● ○ □ □
+const LEVEL_ROLES = ['Корень', 'Зависимость', 'Компонент', 'Подкомпонент', 'Элемент'];
 
-interface LayoutNode {
-  x: number;
-  y: number;
-  w: number;
-  label: string;
-  detail?: string;
-  depth: number;
-  children: LayoutNode[];
+interface LayoutResult {
+  nodes: GraphNode[];
+  links: GraphLink[];
+  maxWidth: number;
+  maxHeight: number;
 }
 
-function measureNodeWidth(label: string, detail?: string): number {
-  const labelW = label.length * 7.5 + NODE_PAD_X * 2;
-  const detailW = detail ? detail.length * 5.5 + NODE_PAD_X * 2 : 0;
-  return Math.max(NODE_MIN_W, labelW, detailW);
-}
+function layoutDependencyTree(
+  depNode: DependencyNode,
+  x: number,
+  y: number,
+  depth: number,
+  idPrefix: string,
+): LayoutResult {
+  const id = idPrefix;
+  const color = LEVEL_COLORS[Math.min(depth, LEVEL_COLORS.length - 1)];
+  const symbol = LEVEL_SYMBOLS[Math.min(depth, LEVEL_SYMBOLS.length - 1)];
+  const role = LEVEL_ROLES[Math.min(depth, LEVEL_ROLES.length - 1)];
+  const radius = depth === 0 ? 34 : depth === 1 ? 24 : 20;
 
-function measureSubtreeWidth(node: DependencyNode, depth: number): number {
-  const nw = measureNodeWidth(node.label, node.detail);
-  if (!node.children || node.children.length === 0) return nw;
-  let totalW = 0;
-  for (let i = 0; i < node.children.length; i++) {
-    totalW += measureSubtreeWidth(node.children[i], depth + 1);
-    if (i < node.children.length - 1) totalW += H_GAP;
-  }
-  return Math.max(nw, totalW);
-}
+  const node: GraphNode = {
+    id,
+    label: depNode.label,
+    x,
+    y,
+    symbol,
+    color,
+    role,
+    description: depNode.detail
+      ? `${depNode.label} — ${depNode.detail}`
+      : `${role}: ${depNode.label}. Элемент дерева зависимостей.`,
+    radius,
+  };
 
-function layoutTree(node: DependencyNode, x: number, y: number, depth: number): LayoutNode {
-  const subtreeW = measureSubtreeWidth(node, depth);
-  const nw = measureNodeWidth(node.label, node.detail);
+  const children = depNode.children ?? [];
 
-  if (!node.children || node.children.length === 0) {
+  if (children.length === 0) {
     return {
-      x: x + (subtreeW - nw) / 2,
-      y,
-      w: nw,
-      label: node.label,
-      detail: node.detail,
-      depth,
-      children: [],
+      nodes: [node],
+      links: [],
+      maxWidth: x + 200,
+      maxHeight: y + 50,
     };
   }
 
-  let totalChildW = 0;
-  const childWidths = node.children.map(c => measureSubtreeWidth(c, depth + 1));
-  for (let i = 0; i < childWidths.length; i++) {
-    totalChildW += childWidths[i];
-    if (i < childWidths.length - 1) totalChildW += H_GAP;
-  }
+  // Layout children
+  const childSpacing = 200;
+  const childY = y + 90;
+  const totalChildWidth = children.length * childSpacing;
+  const startX = x - totalChildWidth / 2 + childSpacing / 2;
 
-  let childX = x + (subtreeW - totalChildW) / 2;
-  const children: LayoutNode[] = [];
-  for (let i = 0; i < node.children.length; i++) {
-    children.push(layoutTree(node.children[i], childX, y + NODE_H + V_GAP, depth + 1));
-    childX += childWidths[i] + H_GAP;
-  }
+  let allNodes: GraphNode[] = [node];
+  let allLinks: GraphLink[] = [];
+  let maxW = x + 200;
+  let maxH = y + 50;
 
-  // Center parent over children
-  const first = children[0];
-  const last = children[children.length - 1];
-  const childrenCenter = (first.x + first.w / 2 + last.x + last.w / 2) / 2;
+  children.forEach((child, i) => {
+    const childX = startX + i * childSpacing;
+    const childId = `${id}-${i}`;
+
+    allLinks.push({
+      from: id,
+      to: childId,
+      color,
+      animated: false,
+    });
+
+    const childResult = layoutDependencyTree(child, childX, childY, depth + 1, childId);
+    allNodes = allNodes.concat(childResult.nodes);
+    allLinks = allLinks.concat(childResult.links);
+    maxW = Math.max(maxW, childResult.maxWidth);
+    maxH = Math.max(maxH, childResult.maxHeight);
+  });
 
   return {
-    x: childrenCenter - nw / 2,
-    y,
-    w: nw,
-    label: node.label,
-    detail: node.detail,
-    depth,
-    children,
+    nodes: allNodes,
+    links: allLinks,
+    maxWidth: maxW,
+    maxHeight: maxH,
   };
 }
 
-function getMaxDimensions(node: LayoutNode): { width: number; height: number } {
-  let maxW = node.x + node.w;
-  let maxH = node.y + NODE_H;
-  for (const child of node.children) {
-    const dims = getMaxDimensions(child);
-    maxW = Math.max(maxW, dims.width);
-    maxH = Math.max(maxH, dims.height);
-  }
-  return { width: maxW, height: maxH };
-}
-
-function TreeNode({ node }: { node: LayoutNode }) {
-  const cx = node.x + node.w / 2;
-  const cy = node.y + NODE_H / 2;
-  const isRoot = node.depth === 0;
-  const colors = LEVEL_COLORS[Math.min(node.depth, LEVEL_COLORS.length - 1)];
-  const hasDetail = !!node.detail;
-  const nodeH = hasDetail ? NODE_H + 16 : NODE_H;
-
-  return (
-    <g>
-      {/* Bezier connectors to children */}
-      {node.children.map((child, i) => {
-        const ccx = child.x + child.w / 2;
-        const ccy = child.y;
-        const midY = cy + nodeH / 2 + (ccy - cy - nodeH / 2) / 2;
-        return (
-          <path key={i}
-            d={`M${cx},${cy + nodeH / 2} C${cx},${midY} ${ccx},${midY} ${ccx},${ccy}`}
-            stroke="#cbd5e1" strokeWidth="1.5" fill="none"
-          />
-        );
-      })}
-
-      {/* Node rectangle */}
-      <rect
-        x={node.x} y={node.y}
-        width={node.w} height={nodeH}
-        rx={10}
-        fill={isRoot ? colors.fill : '#ffffff'}
-        stroke={colors.stroke}
-        strokeWidth={isRoot ? 2 : 1.5}
-      />
-
-      {/* Colored left accent for root */}
-      {isRoot && (
-        <rect x={node.x} y={node.y} width={4} height={nodeH} rx={2} fill={colors.stroke} />
-      )}
-
-      {/* Label */}
-      <text
-        x={isRoot ? node.x + NODE_PAD_X + 4 : cx}
-        y={hasDetail ? cy - 3 : cy}
-        textAnchor={isRoot ? 'start' : 'middle'}
-        dominantBaseline="middle"
-        fill={colors.text}
-        fontSize="13" fontWeight={isRoot ? 700 : 600}
-      >
-        {node.label}
-      </text>
-
-      {/* Detail */}
-      {node.detail && (
-        <text
-          x={isRoot ? node.x + NODE_PAD_X + 4 : cx}
-          y={cy + 13}
-          textAnchor={isRoot ? 'start' : 'middle'}
-          fill="#94a3b8" fontSize="10"
-        >
-          {node.detail}
-        </text>
-      )}
-
-      {/* Children */}
-      {node.children.map((child, i) => (
-        <TreeNode key={i} node={child} />
-      ))}
-    </g>
-  );
-}
-
 export function DependencyGraphDiagram({ data }: { data: DependencyGraphData }) {
-  const root = layoutTree(data.root, SIDE_PAD, 24, 0);
-  const dims = getMaxDimensions(root);
-  const svgW = dims.width + SIDE_PAD;
-  const svgH = dims.height + 24;
+  const PAD = 60;
+  const startX = 400;
+  const startY = PAD + 40;
+
+  const result = layoutDependencyTree(data.root, startX, startY, 0, 'root');
+
+  const svgW = result.maxWidth + PAD * 2;
+  const svgH = result.maxHeight + PAD + 40;
+
+  const legend: GraphLegend[] = [
+    { color: LEVEL_COLORS[0], label: 'Корень' },
+    { color: LEVEL_COLORS[1], label: 'Зависимость' },
+    { color: LEVEL_COLORS[2], label: 'Компонент' },
+  ];
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
-      <defs>
-        <filter id="dg-shadow" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodColor="#000" floodOpacity="0.07" />
-        </filter>
-        <filter id="dg-root-shadow" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="#3b82f6" floodOpacity="0.15" />
-        </filter>
-      </defs>
-      <TreeNode node={root} />
-    </svg>
+    <GraphDiagram
+      nodes={result.nodes}
+      links={result.links}
+      legend={legend}
+      viewBox={{ x: 0, y: 0, w: svgW, h: svgH }}
+    />
   );
 }

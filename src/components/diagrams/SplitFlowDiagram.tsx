@@ -1,247 +1,211 @@
 'use client';
 
-import { SplitFlowDiagramData, SplitFlowStep } from '@/types';
-
-const NODE_H = 40;
-const STEP_GAP = 14;
-const BRANCH_GAP = 56;
-const HEADER_H = 38;
-const INPUT_H = 52;
-const CONCLUSION_H = 40;
-const SIDE_PAD = 32;
-const TOP_PAD = 20;
-const NODE_PAD_X = 18;
-
-function measureStepWidth(step: SplitFlowStep): number {
-  const labelW = step.label.length * 8 + NODE_PAD_X * 2;
-  const detailW = step.detail ? step.detail.length * 6 + NODE_PAD_X * 2 : 0;
-  return Math.max(labelW, detailW, 160);
-}
+import { SplitFlowDiagramData } from '@/types';
+import { GraphDiagram, GraphNode, GraphLink, GraphLegend } from './GraphDiagram';
 
 export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
-  const leftW = Math.max(data.leftBranch.label.length * 9 + 32, ...data.leftBranch.steps.map(measureStepWidth));
-  const rightW = Math.max(data.rightBranch.label.length * 9 + 32, ...data.rightBranch.steps.map(measureStepWidth));
-  const inputW = Math.max(data.input.label.length * 9 + 40, 220);
+  const PAD = 60;
+  const svgW = Math.max(600, 700);
+  const svgH = 200 + Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length) * 80 + (data.conclusion ? 160 : 0) + PAD * 2;
 
-  const svgW = SIDE_PAD + leftW + BRANCH_GAP + rightW + SIDE_PAD;
-  const leftCx = SIDE_PAD + leftW / 2;
-  const rightCx = SIDE_PAD + leftW + BRANCH_GAP + rightW / 2;
-  const inputCx = svgW / 2;
+  const nodes: GraphNode[] = [];
+  const links: GraphLink[] = [];
+  const legend: GraphLegend[] = [];
 
-  const splitY = TOP_PAD + INPUT_H + 24;
-  const branchStartY = splitY + 20;
-  const maxSteps = Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length);
-  const branchContentH = maxSteps * (NODE_H + STEP_GAP) - STEP_GAP;
-  const branchH = HEADER_H + branchContentH + 12;
+  const cx = svgW / 2;
+  const leftCx = svgW * 0.28;
+  const rightCx = svgW * 0.72;
 
-  const conclusionY = branchStartY + branchH + 24;
-  const svgH = conclusionY + (data.conclusion ? CONCLUSION_H * 3 + 32 : 0) + TOP_PAD;
+  // Input node
+  const inputY = PAD + 40;
+  nodes.push({
+    id: 'input',
+    label: data.input.label,
+    x: cx,
+    y: inputY,
+    symbol: '\u25B6', // ▶
+    color: '#6366f1',
+    role: 'Ввод',
+    description: `Входной элемент: ${data.input.label}.${data.input.url ? ` URL: ${data.input.url}` : ''} Это начальная точка, из которой происходит разделение потока.`,
+    radius: 32,
+  });
 
-  function stepY(i: number) {
-    return branchStartY + HEADER_H + 6 + i * (NODE_H + STEP_GAP) + NODE_H / 2;
+  // Left branch header
+  const branchY = inputY + 90;
+  nodes.push({
+    id: 'left-branch',
+    label: data.leftBranch.label,
+    x: leftCx,
+    y: branchY,
+    symbol: '\u25C8', // ◈
+    color: '#f59e0b',
+    role: 'Ветвь',
+    description: `Ветвь: ${data.leftBranch.label}. Левая ветвь разделения потока от «${data.input.label}».`,
+    radius: 26,
+  });
+  links.push({ from: 'input', to: 'left-branch', color: '#f59e0b', label: data.leftBranch.subtitle });
+
+  // Right branch header
+  nodes.push({
+    id: 'right-branch',
+    label: data.rightBranch.label,
+    x: rightCx,
+    y: branchY,
+    symbol: '\u25C8', // ◈
+    color: '#10b981',
+    role: 'Ветвь',
+    description: `Ветвь: ${data.rightBranch.label}. Правая ветвь разделения потока от «${data.input.label}».`,
+    radius: 26,
+  });
+  links.push({ from: 'input', to: 'right-branch', color: '#10b981', label: data.rightBranch.subtitle });
+
+  // Left steps
+  data.leftBranch.steps.forEach((step, i) => {
+    const sy = branchY + 70 * (i + 1);
+    const roleSymbol = getRoleSymbol(step.role);
+    nodes.push({
+      id: `left-step-${i}`,
+      label: step.label,
+      x: leftCx,
+      y: sy,
+      symbol: roleSymbol,
+      color: '#f59e0b',
+      role: getRoleLabel(step.role),
+      description: step.detail
+        ? `${step.label} — ${step.detail}`
+        : `Шаг «${step.label}» в ветви «${data.leftBranch.label}».`,
+      radius: 22,
+    });
+    links.push({
+      from: i === 0 ? 'left-branch' : `left-step-${i - 1}`,
+      to: `left-step-${i}`,
+      color: '#f59e0b',
+    });
+  });
+
+  // Right steps
+  data.rightBranch.steps.forEach((step, i) => {
+    const sy = branchY + 70 * (i + 1);
+    const roleSymbol = getRoleSymbol(step.role);
+    nodes.push({
+      id: `right-step-${i}`,
+      label: step.label,
+      x: rightCx,
+      y: sy,
+      symbol: roleSymbol,
+      color: '#10b981',
+      role: getRoleLabel(step.role),
+      description: step.detail
+        ? `${step.label} — ${step.detail}`
+        : `Шаг «${step.label}» в ветви «${data.rightBranch.label}».`,
+      radius: 22,
+    });
+    links.push({
+      from: i === 0 ? 'right-branch' : `right-step-${i - 1}`,
+      to: `right-step-${i}`,
+      color: '#10b981',
+    });
+  });
+
+  // Conclusion
+  if (data.conclusion) {
+    const conclusionY = branchY + Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length) * 70 + 80;
+
+    nodes.push({
+      id: 'conclusion-left',
+      label: data.conclusion.left,
+      x: leftCx,
+      y: conclusionY,
+      symbol: '\u25C6', // ◆
+      color: '#f59e0b',
+      role: 'Результат',
+      description: `Результат левой ветви: ${data.conclusion.left}.`,
+      radius: 22,
+    });
+
+    nodes.push({
+      id: 'conclusion-right',
+      label: data.conclusion.right,
+      x: rightCx,
+      y: conclusionY,
+      symbol: '\u25C6', // ◆
+      color: '#10b981',
+      role: 'Результат',
+      description: `Результат правой ветви: ${data.conclusion.right}.`,
+      radius: 22,
+    });
+
+    const lastLeft = data.leftBranch.steps.length > 0
+      ? `left-step-${data.leftBranch.steps.length - 1}`
+      : 'left-branch';
+    const lastRight = data.rightBranch.steps.length > 0
+      ? `right-step-${data.rightBranch.steps.length - 1}`
+      : 'right-branch';
+
+    links.push({ from: lastLeft, to: 'conclusion-left', color: '#f59e0b' });
+    links.push({ from: lastRight, to: 'conclusion-right', color: '#10b981' });
+
+    // Highlight
+    if (data.conclusion.highlight) {
+      nodes.push({
+        id: 'highlight',
+        label: data.conclusion.highlight,
+        x: cx,
+        y: conclusionY + 70,
+        symbol: '\u26A0', // ⚠
+        color: '#ef4444',
+        role: 'Угроза',
+        description: `Критический вывод: ${data.conclusion.highlight}. Общее следствие обеих ветвей.`,
+        radius: 28,
+      });
+      links.push({ from: 'conclusion-left', to: 'highlight', color: '#ef4444', animated: true });
+      links.push({ from: 'conclusion-right', to: 'highlight', color: '#ef4444', animated: true });
+    }
+  }
+
+  legend.push({ color: '#6366f1', label: 'Ввод' });
+  legend.push({ color: '#f59e0b', label: data.leftBranch.label });
+  legend.push({ color: '#10b981', label: data.rightBranch.label });
+  if (data.conclusion?.highlight) {
+    legend.push({ color: '#ef4444', label: 'Угроза' });
   }
 
   return (
-    <svg viewBox={`0 0 ${svgW} ${svgH}`} fill="none" className="w-full" style={{ maxHeight: 600 }}>
-      <defs>
-        {/* Shadows */}
-        <filter id="sf-input-shadow" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="#6366f1" floodOpacity="0.2" />
-        </filter>
-        <filter id="sf-node-shadow" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodColor="#000" floodOpacity="0.06" />
-        </filter>
-        <filter id="sf-header-shadow" x="-5%" y="-10%" width="110%" height="130%">
-          <feDropShadow dx="0" dy="1" stdDeviation="3" floodColor="#000" floodOpacity="0.05" />
-        </filter>
-        <filter id="sf-danger-shadow" x="-10%" y="-10%" width="120%" height="130%">
-          <feDropShadow dx="0" dy="2" stdDeviation="6" floodColor="#ef4444" floodOpacity="0.2" />
-        </filter>
-
-        {/* Edge gradients */}
-        <linearGradient id="sf-grad-left" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#f59e0b" />
-        </linearGradient>
-        <linearGradient id="sf-grad-right" x1="0%" y1="0%" x2="0%" y2="100%">
-          <stop offset="0%" stopColor="#6366f1" />
-          <stop offset="100%" stopColor="#10b981" />
-        </linearGradient>
-
-        {/* Arrow markers */}
-        <marker id="sf-arrow-left" viewBox="0 0 10 7" refX={10} refY={3.5} markerWidth={8} markerHeight={6} orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill="#f59e0b" />
-        </marker>
-        <marker id="sf-arrow-right" viewBox="0 0 10 7" refX={10} refY={3.5} markerWidth={8} markerHeight={6} orient="auto">
-          <polygon points="0 0, 10 3.5, 0 7" fill="#10b981" />
-        </marker>
-      </defs>
-
-      {/* ─── Input node (dark indigo) ─── */}
-      <rect x={inputCx - inputW / 2} y={TOP_PAD} width={inputW} height={INPUT_H} rx={26}
-        fill="#1e1b4b" stroke="#6366f1" strokeWidth={2}
-        filter="url(#sf-input-shadow)"
-      />
-      <text x={inputCx} y={TOP_PAD + INPUT_H / 2 - (data.input.url ? 7 : 0)}
-        textAnchor="middle" dominantBaseline="middle"
-        fill="#e0e7ff" fontSize="14" fontWeight="700">
-        {data.input.label}
-      </text>
-      {data.input.url && (
-        <text x={inputCx} y={TOP_PAD + INPUT_H / 2 + 9}
-          textAnchor="middle" dominantBaseline="middle"
-          fill="#a5b4fc" fontSize="10" fontFamily="monospace">
-          {data.input.url}
-        </text>
-      )}
-
-      {/* ─── Split lines (gradient edges) ─── */}
-      <line x1={inputCx} y1={TOP_PAD + INPUT_H} x2={inputCx} y2={splitY} stroke="#6366f1" strokeWidth="2" strokeOpacity="0.5" />
-      <line x1={inputCx} y1={splitY} x2={leftCx} y2={splitY} stroke="#f59e0b" strokeWidth="2" strokeOpacity="0.5" />
-      <line x1={inputCx} y1={splitY} x2={rightCx} y2={splitY} stroke="#10b981" strokeWidth="2" strokeOpacity="0.5" />
-      <line x1={leftCx} y1={splitY} x2={leftCx} y2={branchStartY} stroke="url(#sf-grad-left)" strokeWidth="2" markerEnd="url(#sf-arrow-left)" />
-      <line x1={rightCx} y1={splitY} x2={rightCx} y2={branchStartY} stroke="url(#sf-grad-right)" strokeWidth="2" markerEnd="url(#sf-arrow-right)" />
-
-      {/* ─── Left branch ─── */}
-      <rect x={SIDE_PAD} y={branchStartY} width={leftW} height={branchH} rx={12}
-        fill="#fffbeb" fillOpacity="0.4" stroke="#f59e0b" strokeWidth="1" strokeOpacity="0.25"
-      />
-      <rect x={SIDE_PAD + 6} y={branchStartY + 6} width={leftW - 12} height={HEADER_H - 12} rx={8}
-        fill="#fffbeb" stroke="#f59e0b" strokeWidth="1.5"
-        filter="url(#sf-header-shadow)"
-      />
-      <text x={leftCx} y={branchStartY + HEADER_H / 2 + 1} textAnchor="middle" dominantBaseline="middle"
-        fill="#92400e" fontSize="13" fontWeight="700">
-        {data.leftBranch.label}
-      </text>
-
-      {/* Left steps */}
-      {data.leftBranch.steps.map((step, i) => {
-        const sw = measureStepWidth(step);
-        const y = stepY(i);
-        return (
-          <g key={`l-${i}`}>
-            {i > 0 && (
-              <line x1={leftCx} y1={y - NODE_H / 2 - STEP_GAP} x2={leftCx} y2={y - NODE_H / 2}
-                stroke="#f59e0b" strokeWidth="1" strokeOpacity="0.3" />
-            )}
-            <rect x={leftCx - sw / 2} y={y - NODE_H / 2} width={sw} height={NODE_H} rx={8}
-              fill="#ffffff" stroke="#fbbf24" strokeWidth="1"
-              filter="url(#sf-node-shadow)"
-            />
-            <text x={leftCx} y={step.detail ? y - 5 : y} textAnchor="middle" dominantBaseline="middle"
-              fill="#92400e" fontSize="12" fontWeight="600">
-              {step.label}
-            </text>
-            {step.detail && (
-              <text x={leftCx} y={y + 10} textAnchor="middle" dominantBaseline="middle"
-                fill="#94a3b8" fontSize="9">
-                {step.detail}
-              </text>
-            )}
-          </g>
-        );
-      })}
-
-      {/* ─── Right branch ─── */}
-      <rect x={SIDE_PAD + leftW + BRANCH_GAP} y={branchStartY} width={rightW} height={branchH} rx={12}
-        fill="#f0fdf4" fillOpacity="0.4" stroke="#10b981" strokeWidth="1" strokeOpacity="0.25"
-      />
-      <rect x={SIDE_PAD + leftW + BRANCH_GAP + 6} y={branchStartY + 6} width={rightW - 12} height={HEADER_H - 12} rx={8}
-        fill="#f0fdf4" stroke="#10b981" strokeWidth="1.5"
-        filter="url(#sf-header-shadow)"
-      />
-      <text x={rightCx} y={branchStartY + HEADER_H / 2 + 1} textAnchor="middle" dominantBaseline="middle"
-        fill="#166534" fontSize="13" fontWeight="700">
-        {data.rightBranch.label}
-      </text>
-
-      {/* Right steps */}
-      {data.rightBranch.steps.map((step, i) => {
-        const sw = measureStepWidth(step);
-        const y = stepY(i);
-        return (
-          <g key={`r-${i}`}>
-            {i > 0 && (
-              <line x1={rightCx} y1={y - NODE_H / 2 - STEP_GAP} x2={rightCx} y2={y - NODE_H / 2}
-                stroke="#10b981" strokeWidth="1" strokeOpacity="0.3" />
-            )}
-            <rect x={rightCx - sw / 2} y={y - NODE_H / 2} width={sw} height={NODE_H} rx={8}
-              fill="#ffffff" stroke="#4ade80" strokeWidth="1"
-              filter="url(#sf-node-shadow)"
-            />
-            <text x={rightCx} y={step.detail ? y - 5 : y} textAnchor="middle" dominantBaseline="middle"
-              fill="#166534" fontSize="12" fontWeight="600">
-              {step.label}
-            </text>
-            {step.detail && (
-              <text x={rightCx} y={y + 10} textAnchor="middle" dominantBaseline="middle"
-                fill="#94a3b8" fontSize="9">
-                {step.detail}
-              </text>
-            )}
-          </g>
-        );
-      })}
-
-      {/* ─── Conclusion ─── */}
-      {data.conclusion && (() => {
-        const cy = conclusionY;
-        const leftResultW = data.conclusion.left.length * 8 + 32;
-        const rightResultW = data.conclusion.right.length * 8 + 32;
-
-        return (
-          <g>
-            {/* Lines from branches */}
-            <path d={`M${leftCx},${branchStartY + branchH} L${leftCx},${cy + CONCLUSION_H / 2}`}
-              stroke="#f59e0b" strokeWidth="1.5" strokeOpacity="0.4" />
-            <path d={`M${rightCx},${branchStartY + branchH} L${rightCx},${cy + CONCLUSION_H / 2}`}
-              stroke="#10b981" strokeWidth="1.5" strokeOpacity="0.4" />
-
-            {/* Left result */}
-            <rect x={leftCx - leftResultW / 2} y={cy} width={leftResultW} height={CONCLUSION_H} rx={8}
-              fill="#fffbeb" stroke="#f59e0b" strokeWidth="1.5"
-              filter="url(#sf-node-shadow)"
-            />
-            <text x={leftCx} y={cy + CONCLUSION_H / 2} textAnchor="middle" dominantBaseline="middle"
-              fill="#92400e" fontSize="12" fontWeight="600">
-              {data.conclusion.left}
-            </text>
-
-            {/* Right result */}
-            <rect x={rightCx - rightResultW / 2} y={cy} width={rightResultW} height={CONCLUSION_H} rx={8}
-              fill="#f0fdf4" stroke="#10b981" strokeWidth="1.5"
-              filter="url(#sf-node-shadow)"
-            />
-            <text x={rightCx} y={cy + CONCLUSION_H / 2} textAnchor="middle" dominantBaseline="middle"
-              fill="#166534" fontSize="12" fontWeight="600">
-              {data.conclusion.right}
-            </text>
-
-            {/* Danger highlight */}
-            {data.conclusion.highlight && (() => {
-              const hlW = data.conclusion.highlight.length * 9 + 40;
-              const hlY = cy + CONCLUSION_H + 16;
-              return (
-                <g>
-                  <line x1={leftCx} y1={cy + CONCLUSION_H} x2={leftCx} y2={hlY + CONCLUSION_H / 2}
-                    stroke="#f59e0b" strokeWidth="1" strokeOpacity="0.3" />
-                  <line x1={rightCx} y1={cy + CONCLUSION_H} x2={rightCx} y2={hlY + CONCLUSION_H / 2}
-                    stroke="#10b981" strokeWidth="1" strokeOpacity="0.3" />
-                  <rect x={inputCx - hlW / 2} y={hlY} width={hlW} height={CONCLUSION_H} rx={20}
-                    fill="#fef2f2" stroke="#ef4444" strokeWidth={2}
-                    filter="url(#sf-danger-shadow)"
-                  />
-                  <text x={inputCx} y={hlY + CONCLUSION_H / 2} textAnchor="middle" dominantBaseline="middle"
-                    fill="#991b1b" fontSize="13" fontWeight="700">
-                    {data.conclusion.highlight}
-                  </text>
-                </g>
-              );
-            })()}
-          </g>
-        );
-      })()}
-    </svg>
+    <GraphDiagram
+      nodes={nodes}
+      links={links}
+      legend={legend}
+      viewBox={{ x: 0, y: 0, w: svgW, h: svgH }}
+    />
   );
+}
+
+/* ─── Helpers ─── */
+
+function getRoleSymbol(role: string): string {
+  const map: Record<string, string> = {
+    input: '\u25B6',    // ▶
+    process: '\u2699',  // ⚙
+    decision: '\u25C6', // ◆
+    output: '\u25C0',   // ◀
+    danger: '\u26A0',   // ⚠
+    success: '\u2713',  // ✓
+    warning: '\u26A1',  // ⚡
+    neutral: '\u25CF',  // ●
+  };
+  return map[role] ?? '\u25CF';
+}
+
+function getRoleLabel(role: string): string {
+  const map: Record<string, string> = {
+    input: 'Ввод',
+    process: 'Обработка',
+    decision: 'Решение',
+    output: 'Вывод',
+    danger: 'Опасность',
+    success: 'Успех',
+    warning: 'Предупреждение',
+    neutral: 'Шаг',
+  };
+  return map[role] ?? 'Шаг';
 }
