@@ -4,9 +4,9 @@ import { SplitFlowDiagramData } from '@/types';
 import { GraphDiagram, GraphNode, GraphLink, GraphLegend } from './GraphDiagram';
 
 export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
-  const PAD = 60;
-  const svgW = Math.max(600, 700);
-  const svgH = 200 + Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length) * 80 + (data.conclusion ? 160 : 0) + PAD * 2;
+  const PAD = 80;
+  const svgW = Math.max(700, 800);
+  const svgH = 200 + Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length) * 90 + (data.conclusion ? 180 : 0) + PAD * 2;
 
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
@@ -61,7 +61,7 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
 
   // Left steps
   data.leftBranch.steps.forEach((step, i) => {
-    const sy = branchY + 70 * (i + 1);
+    const sy = branchY + 85 * (i + 1);
     const roleSymbol = getRoleSymbol(step.role);
     nodes.push({
       id: `left-step-${i}`,
@@ -85,7 +85,7 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
 
   // Right steps
   data.rightBranch.steps.forEach((step, i) => {
-    const sy = branchY + 70 * (i + 1);
+    const sy = branchY + 85 * (i + 1);
     const roleSymbol = getRoleSymbol(step.role);
     nodes.push({
       id: `right-step-${i}`,
@@ -109,7 +109,7 @@ export function SplitFlowDiagram({ data }: { data: SplitFlowDiagramData }) {
 
   // Conclusion
   if (data.conclusion) {
-    const conclusionY = branchY + Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length) * 70 + 80;
+    const conclusionY = branchY + Math.max(data.leftBranch.steps.length, data.rightBranch.steps.length) * 85 + 100;
 
     nodes.push({
       id: 'conclusion-left',

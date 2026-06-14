@@ -23,18 +23,18 @@ const ROLE_SYMBOLS: Record<string, string> = {
 export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
   const topics = data.topics;
   const cx = 440;
-  const cy = 340;
-  const ORBIT_R = 180;
-  const SUB_ORBIT_R = 85;
+  const cy = 360;
+  const ORBIT_R = 190;
+  const SUB_ORBIT_R = 90;
   const CENTER_R = 40;
   const TOPIC_R = 28;
   const SUB_R = 20;
 
-  const PAD = 60;
+  const PAD = 100;
   const vbW = cx * 2 + PAD * 2;
   const vbH = cy * 2 + PAD * 2;
   const ox = -PAD + (cx - 440);
-  const oy = -PAD + (cy - 340);
+  const oy = -PAD + (cy - 360);
 
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
@@ -60,9 +60,10 @@ export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
     const ty = cy + ORBIT_R * Math.sin(angle);
     const color = TOPIC_COLORS[i % TOPIC_COLORS.length].stroke;
 
-    // Clamp positions within viewBox
-    const clampedTx = Math.max(ox + TOPIC_R + 10, Math.min(ox + vbW - TOPIC_R - 10, tx));
-    const clampedTy = Math.max(oy + TOPIC_R + 10, Math.min(oy + vbH - TOPIC_R - 10, ty));
+    // Clamp positions within viewBox — keep labels from being clipped
+    const margin = TOPIC_R + 30; // extra margin for label text below/beside node
+    const clampedTx = Math.max(ox + margin, Math.min(ox + vbW - margin, tx));
+    const clampedTy = Math.max(oy + margin, Math.min(oy + vbH - margin, ty));
 
     nodes.push({
       id: `topic-${i}`,
@@ -97,9 +98,10 @@ export function KnowledgeMapDiagram({ data }: { data: KnowledgeMapData }) {
       let sx = clampedTx + SUB_ORBIT_R * Math.cos(childAngle);
       let sy = clampedTy + SUB_ORBIT_R * Math.sin(childAngle);
 
-      // Clamp within viewBox
-      sx = Math.max(ox + SUB_R + 10, Math.min(ox + vbW - SUB_R - 10, sx));
-      sy = Math.max(oy + SUB_R + 10, Math.min(oy + vbH - SUB_R - 10, sy));
+      // Clamp within viewBox — extra margin for label
+      const subMargin = SUB_R + 30;
+      sx = Math.max(ox + subMargin, Math.min(ox + vbW - subMargin, sx));
+      sy = Math.max(oy + subMargin, Math.min(oy + vbH - subMargin, sy));
 
       nodes.push({
         id: `child-${i}-${j}`,

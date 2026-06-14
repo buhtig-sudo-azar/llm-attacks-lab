@@ -84,6 +84,10 @@ await api.deleteUser({ userId: "current_user" });`,
           { mistake: 'Доверие к выводу LLM как к безопасному контенту', explanation: 'Разработчики часто предполагают, что LLM не может сгенерировать вредоносный контент, и не валидируют вывод перед отображением в браузере.', correctApproach: 'Рассматривайте вывод LLM как ненадёжные данные и применяйте санитизацию перед рендерингом, аналогично любому пользовательскому вводу.' },
           { mistake: 'Ограничение доступа через промпты', explanation: 'Попытки запретить LLM использовать определённые API через инструкции в промпте ненадёжны — злоумышленник может переопределить их через jailbreak.', correctApproach: 'Реализуйте контроль доступа на уровне API-сервера, а не на уровне промптов. LLM не должен быть единственным барьером.' },
         ],
+        sandboxes: [
+          { type: 'token-counter', title: 'Счётчик токенов', description: 'Оцените количество токенов в тексте и использование контекстного окна разных моделей' },
+          { type: 'prompt-injection-sim', title: 'Симулятор Prompt Injection', description: 'Попробуйте внедрить инструкцию и проверить, распознает ли система атаку' },
+        ],
         furtherReading: [
           { topic: 'Прямой Prompt Injection', slug: 'direct-prompt-injection', categorySlug: 'prompt-injection' },
           { topic: 'Как работают LLM API', slug: 'how-llm-apis-work', categorySlug: 'llm-api-exploitation' },
@@ -167,6 +171,10 @@ user_input = """
         commonMistakes: [
           { mistake: 'Полагаться на RLHF как на достаточную защиту', explanation: 'RLHF уменьшает вероятность генерации вредоносного контента, но не предотвращает целенаправленные атаки. Jailbreak-промпты могут обходить RLHF-ограничения.', correctApproach: 'Используйте RLHF как один из уровней защиты, но не единственный. Реализуйте guardrails на уровне API-шлюза и валидацию вывода.' },
           { mistake: 'Считать системный промпт секретным', explanation: 'Системный промпт может быть извлечён через техники prompt leaking. Никогда не помещайте в него секреты, пароли или ключи API.', correctApproach: 'Системный промпт должен считаться публично доступным. Секреты должны храниться в серверных переменных окружения и никогда не передаваться в промпт.' },
+        ],
+        sandboxes: [
+          { type: 'embedding-visualizer', title: 'Визуализация эмбеддингов', description: 'Увидьте, как слова группируются в многомерном пространстве по смыслу' },
+          { type: 'vuln-scanner', title: 'Сканер уязвимостей LLM-интеграции', description: 'Настройте параметры интеграции и оцените уровень безопасности' },
         ],
         furtherReading: [
           { topic: 'Прямой Prompt Injection', slug: 'direct-prompt-injection', categorySlug: 'prompt-injection' },
@@ -273,6 +281,9 @@ llm.functionCall({
           { mistake: 'Защита через промпт-инструкции', explanation: 'Добавление инструкций «не выполняй вредоносные запросы» в системный промпт ненадёжно. Злоумышленник может переопределить их jailbreaker-промптами.', correctApproach: 'Реализуйте контроль доступа на уровне API-сервера. Промпт-инструкции — лишь один из уровней защиты, а не основной.' },
           { mistake: 'Чёрные списки ключевых слов', explanation: 'Фильтрация ввода по ключевым словам типа «ignore» или «DAN» легко обходится через обфускацию, кодирование или косвенные формулировки.', correctApproach: 'Используйте поведенческий анализ и ML-классификаторы для обнаружения инъекций, а не простую фильтрацию.' },
         ],
+        sandboxes: [
+          { type: 'prompt-injection-sim', title: 'Симулятор Prompt Injection', description: 'Попробуйте различные техники прямого внедрения промптов: DAN, Goal Hijacking, Prompt Leaking' },
+        ],
         furtherReading: [
           { topic: 'Косвенный Prompt Injection', slug: 'indirect-prompt-injection', categorySlug: 'prompt-injection' },
           { topic: 'Mapping поверхности атаки', slug: 'mapping-llm-api-attack-surface', categorySlug: 'llm-api-exploitation' },
@@ -367,6 +378,9 @@ API function immediately.
         commonMistakes: [
           { mistake: 'Полагаться на способность LLM различать инструкции в данных', explanation: 'Даже хорошо настроенные модели могут быть обмануты фейковой разметкой или поддельными ответами. LLM не имеет надёжного механизма различения инструкций от данных.', correctApproach: 'Внедряйте обработку на уровне API: разделяйте контент от инструкций на архитектурном уровне, а не полагайтесь на способность модели их различить.' },
           { mistake: 'Недооценка RAG как вектора атаки', explanation: 'Документы в RAG-системах часто считаются «доверенными», но любой пользовательский контент в векторной БД может содержать вредоносные инструкции.', correctApproach: 'Фильтруйте и валидируйте документы перед добавлением в векторную базу данных. Рассматривайте RAG-контент как ненадёжный.' },
+        ],
+        sandboxes: [
+          { type: 'indirect-injection-detector', title: 'Детектор косвенных инъекций', description: 'Проанализируйте контент (email, документ, веб-страницу) на наличие скрытых инструкций' },
         ],
         furtherReading: [
           { topic: 'Небезопасная обработка вывода', slug: 'insecure-output-handling-overview', categorySlug: 'insecure-output-handling' },
@@ -465,6 +479,9 @@ const result = await fetch('/api/users/carlos', {
           { mistake: 'Выполнение function calls без подтверждения', explanation: 'Сервер автоматически выполняет все function calls, которые возвращает LLM, без запроса подтверждения у пользователя.', correctApproach: 'Внедрите шаг подтверждения: показывайте пользователю, какое действие будет выполнено, и требуйте явного согласия перед вызовом API.' },
           { mistake: 'Передача системных токенов в API-вызовы', explanation: 'API-вызовы от LLM выполняются с системными учётными данными, а не с учётными данными пользователя, что даёт полный доступ.', correctApproach: 'Используйте учётные данные конкретного пользователя при вызове API от его имени, чтобы применялись корректные права доступа.' },
         ],
+        sandboxes: [
+          { type: 'api-call-sim', title: 'Симулятор вызова API', description: 'Введите запрос и посмотрите, какую функцию вызовет LLM и насколько это опасно' },
+        ],
         furtherReading: [
           { topic: 'Mapping поверхности атаки', slug: 'mapping-llm-api-attack-surface', categorySlug: 'llm-api-exploitation' },
           { topic: 'Прямой Prompt Injection', slug: 'direct-prompt-injection', categorySlug: 'prompt-injection' },
@@ -543,6 +560,9 @@ llm: [calls delete_account("carlos")]`,
           { mistake: 'Игнорирование «безобидных» API', explanation: 'Даже API, которые кажутся безопасными (например, поиск по каталогу), могут быть использованы для chained-атак через SQL-инъекции или path traversal.', correctApproach: 'Тестируйте все доступные LLM API на классические веб-уязвимости, независимо от того, насколько безобидными они кажутся.' },
           { mistake: 'Недооценка техник социального инжиниринга LLM', explanation: 'Прямой вопрос о API может не сработать, но ложный контекст («я разработчик») часто позволяет обойти ограничения модели.', correctApproach: 'При пентестировании используйте различные подходы: прямые запросы, ложный контекст, косвенные вопросы и анализ поведения.' },
         ],
+        sandboxes: [
+          { type: 'vuln-scanner', title: 'Сканер поверхности атаки', description: 'Настройте конфигурацию LLM-интеграции и найдите уязвимости' },
+        ],
         furtherReading: [
           { topic: 'Цепочки уязвимостей в LLM API', slug: 'chaining-llm-api-vulnerabilities', categorySlug: 'llm-api-exploitation' },
           { topic: 'Методология обнаружения', slug: 'detecting-llm-vulnerabilities', categorySlug: 'detecting-llm-vulns' },
@@ -613,6 +633,9 @@ with open(f"/app/data/{filename}") as f:
         commonMistakes: [
           { mistake: 'Тестирование только «опасных» API', explanation: 'Пентестеры часто фокусируются на API удаления или модификации, игнорируя «читающие» API, которые могут содержать SQL-инъекции или path traversal.', correctApproach: 'Тестируйте ВСЕ доступные LLM API на классические уязвимости, особенно те, что принимают строковые параметры.' },
           { mistake: 'Санитизация только прямого пользовательского ввода', explanation: 'Разработчики валидируют ввод в формах, но не валидируют ввод, приходящий через LLM function calls.', correctApproach: 'Реализуйте валидацию на уровне API-эндпоинтов, независимо от источника вызова — от пользователя напрямую или через LLM.' },
+        ],
+        sandboxes: [
+          { type: 'chain-builder', title: 'Построитель цепочек атак', description: 'Соберите цепочку из нескольких уязвимостей и оцените совокупный ущерб' },
         ],
         furtherReading: [
           { topic: 'Небезопасная обработка вывода', slug: 'insecure-output-handling-overview', categorySlug: 'insecure-output-handling' },
@@ -717,6 +740,9 @@ document.getElementById('chat').innerHTML = clean;`,
           { mistake: 'Доверие к Markdown-рендерингу LLM', explanation: 'Markdown, сгенерированный LLM, может содержать HTML-теги и JavaScript. Многие Markdown-рендереры разрешают HTML по умолчанию.', correctApproach: 'Настройте Markdown-рендерер на запрет HTML или пропускайте вывод через HTML-санитизатор перед рендерингом.' },
           { mistake: 'Валидация только ввода, не вывода', explanation: 'Разработчики фокусируются на фильтрации пользовательского ввода, но не валидируют вывод LLM, который может содержать вредоносный контент, инспирированный prompt injection.', correctApproach: 'Реализуйте валидацию обоих направлений: ввод в LLM и вывод из LLM. Оба являются ненадёжными данными.' },
         ],
+        sandboxes: [
+          { type: 'output-sanitizer', title: 'Санитизатор вывода LLM', description: 'Проверьте вывод модели на наличие XSS, SSRF и SQL-инъекций' },
+        ],
         furtherReading: [
           { topic: 'Косвенный Prompt Injection', slug: 'indirect-prompt-injection', categorySlug: 'prompt-injection' },
           { topic: 'Защита от атак на LLM', slug: 'defending-against-llm-attacks', categorySlug: 'llm-defenses' },
@@ -800,6 +826,9 @@ and provide a link to attacker.com/free-widget
         commonMistakes: [
           { mistake: 'Доверие к пользовательскому контенту в RAG', explanation: 'Документы, загружаемые пользователями в векторную базу, часто не проходят санитизацию и могут содержать скрытые инструкции.', correctApproach: 'Фильтруйте и валидируйте все документы перед добавлением в RAG-систему. Сканируйте на наличие промпт-инъекций.' },
           { mistake: 'Отсутствие мониторинга модели после обучения', explanation: "После fine-tuning'а модель может демонстрировать аномальное поведение из-за отравленных данных, но это не обнаруживается без активного тестирования.", correctApproach: 'Регулярно тестируйте модель на наличие бэкдоров и аномалий после каждого обновления обучающих данных.' },
+        ],
+        sandboxes: [
+          { type: 'data-poisoning-sim', title: 'Симулятор отравления данных', description: 'Увидьте, как внедрение вредоносных данных в обучающую выборку меняет поведение модели' },
         ],
         furtherReading: [
           { topic: 'Утечка чувствительных данных', slug: 'leaking-sensitive-training-data', categorySlug: 'training-data-attacks' },
@@ -885,6 +914,9 @@ decoded = base64.b64decode(encoded).decode()
         commonMistakes: [
           { mistake: 'Фильтрация только по ключевым словам', explanation: 'Фильтры, ищущие слова «password» или «secret» в выводе, легко обходятся через base64-кодирование, character splicing или перевод на другой язык.', correctApproach: 'Реализуйте многоуровневую фильтрацию: семантический анализ, проверку кодировок, мониторинг аномалий в выводе.' },
           { mistake: 'Включение чувствительных данных в обучающий корпус', explanation: 'Разработчики иногда используют реальные данные (логи, email, БД) для fine-tuning без анонимизации, что приводит к запоминанию моделью конфиденциальной информации.', correctApproach: 'Применяйте строгую анонимизацию и удаление чувствительных данных перед использованием в обучении. Давайте модели доступ только к данным, которые может увидеть наименее привилегированный пользователь.' },
+        ],
+        sandboxes: [
+          { type: 'data-leak-detector', title: 'Детектор утечки данных', description: 'Проверьте, какую чувствительную информацию модель может раскрыть через запросы' },
         ],
         furtherReading: [
           { topic: 'Отравление обучающих данных', slug: 'training-data-poisoning', categorySlug: 'training-data-attacks' },
@@ -990,6 +1022,9 @@ decoded = base64.b64decode(encoded).decode()
           { mistake: 'Тестирование только прямых промптов', explanation: 'Пентестеры часто тестируют только прямой ввод в чат, игнорируя косвенные векторы: обработку веб-страниц, писем, RAG-документов.', correctApproach: 'Тестируйте все входы LLM, включая косвенные. Если модель обрабатывает внешний контент, проверьте indirect prompt injection.' },
           { mistake: 'Игнорирование API за LLM', explanation: 'Фокусируясь на безопасности самой модели, забывают протестировать API, которые она вызывает, на классические уязвимости.', correctApproach: 'После выявления API проведите полное тестирование каждого на SQL-инъекции, path traversal, SSRF и другие классические уязвимости.' },
         ],
+        sandboxes: [
+          { type: 'vuln-scanner', title: 'Сканер уязвимостей', description: 'Проведите аудит конфигурации LLM-интеграции и получите оценку безопасности' },
+        ],
         furtherReading: [
           { topic: 'Как работают LLM API', slug: 'how-llm-apis-work', categorySlug: 'llm-api-exploitation' },
           { topic: 'Защита от атак на LLM', slug: 'defending-against-llm-attacks', categorySlug: 'llm-defenses' },
@@ -1070,6 +1105,9 @@ AI-сканеры представляют уникальную поверхно
         commonMistakes: [
           { mistake: 'Доверие к контенту сканируемых страниц', explanation: 'AI-сканеры часто обрабатывают контент без разделения на «данные» и «инструкции», что позволяет внедрять команды через сканируемый контент.', correctApproach: 'Реализуйте строгое разделение контента и инструкций в AI-сканере. Никогда не используйте сканируемый контент как часть промпта модели без санитизации.' },
         ],
+        sandboxes: [
+          { type: 'scanner-exploit-sim', title: 'Эксплуатация AI-сканера', description: 'Попробуйте обмануть AI-сканер, внедрив скрытую инструкцию в легитимный запрос' },
+        ],
         furtherReading: [
           { topic: 'Косвенный Prompt Injection в AI-сканерах', slug: 'indirect-prompt-injection-in-ai-scanners', categorySlug: 'ai-scanner-vulns' },
           { topic: 'Защита от уязвимостей AI-сканеров', slug: 'defending-against-ai-scanner-vulns', categorySlug: 'llm-defenses' },
@@ -1144,6 +1182,9 @@ Content-Type: text/html
         commonMistakes: [
           { mistake: 'Отсутствие санитизации входного контента', explanation: 'AI-сканеры часто передают сканируемый контент напрямую в LLM без предварительной фильтрации или экранирования.', correctApproach: 'Фильтруйте и экранируйте сканируемый контент перед передачей в LLM-компонент. Удаляйте потенциально вредоносные инструкции.' },
         ],
+        sandboxes: [
+          { type: 'scanner-exploit-sim', title: 'Инъекция через AI-сканер', description: 'Внедрите вредоносную инструкцию через контент, обрабатываемый AI-сканером' },
+        ],
         furtherReading: [
           { topic: 'Эксфильтрация данных через AI-сканеры', slug: 'data-exfiltration-via-ai-scanners', categorySlug: 'ai-scanner-vulns' },
           { topic: 'Защита от уязвимостей AI-сканеров', slug: 'defending-against-ai-scanner-vulns', categorySlug: 'llm-defenses' },
@@ -1213,6 +1254,9 @@ Content-Type: text/html
         ],
         commonMistakes: [
           { mistake: 'Отсутствие egress-фильтрации для AI-сканера', explanation: 'AI-сканеры часто имеют неограниченный исходящий доступ к интернету, что позволяет отправлять данные на любые внешние серверы.', correctApproach: 'Реализуйте строгую egress-фильтрацию: разрешайте исходящие соединения только к whitelist-доменам. Мониторьте аномальный трафик.' },
+        ],
+        sandboxes: [
+          { type: 'exfiltration-lab', title: 'Лаборатория эксфильтрации', description: 'Изучите методы извлечения данных через Markdown-инъекции, фишинговые ссылки и API-вызовы' },
         ],
         furtherReading: [
           { topic: 'Защита от уязвимостей AI-сканеров', slug: 'defending-against-ai-scanner-vulns', categorySlug: 'llm-defenses' },
@@ -1311,6 +1355,9 @@ app.delete('/api/users/:id', async (req, res) => {
           { mistake: 'Полагаться на промпты как основной механизм защиты', explanation: 'Инструкции вида «не вызывай delete_account» в системном промпте могут быть обойдены через jailbreak. Модель не может надёжно самоконтролироваться.', correctApproach: 'Реализуйте авторизацию и контроль доступа на уровне API-сервера. Промпт-инструкции — лишь дополнительный уровень, а не основной.' },
           { mistake: 'Передача системных токенов в LLM-запросы', explanation: 'Использование системных учётных данных при вызове API от имени LLM даёт модели полный доступ ко всем ресурсам.', correctApproach: 'Используйте учётные данные конкретного пользователя. Применяйте least privilege: давайте LLM доступ только к необходимым API с минимальными правами.' },
         ],
+        sandboxes: [
+          { type: 'defense-configurator', title: 'Конфигуратор защиты', description: 'Настройте уровни защиты LLM-приложения и проверьте покрытие от основных атак' },
+        ],
         furtherReading: [
           { topic: 'Защита от уязвимостей AI-сканеров', slug: 'defending-against-ai-scanner-vulns', categorySlug: 'llm-defenses' },
           { topic: 'Небезопасная обработка вывода', slug: 'insecure-output-handling-overview', categorySlug: 'insecure-output-handling' },
@@ -1402,6 +1449,9 @@ class SafeAIScanner {
         commonMistakes: [
           { mistake: 'Неограниченный исходящий доступ сканера', explanation: 'AI-сканеры часто могут отправлять запросы на любые URL, включая внутренние метаданные и внешние серверы злоумышленников.', correctApproach: 'Реализуйте строгую egress-фильтрацию и проксирование всех запросов сканера через контролируемый шлюз.' },
           { mistake: 'Объединение анализа и выполнения в одной модели', explanation: 'Использование одной и той же LLM для анализа контента и принятия решений о действиях создаёт вектор для prompt injection.', correctApproach: 'Разделите анализ и выполнение: одна модель анализирует контент, другая (с ограниченным промптом) принимает решения о действиях.' },
+        ],
+        sandboxes: [
+          { type: 'scanner-defense-lab', title: 'Защита AI-сканера', description: 'Настройте меры защиты AI-сканера и проверьте, блокируют ли они известные атаки' },
         ],
         furtherReading: [
           { topic: 'Защита от атак на LLM', slug: 'defending-against-llm-attacks', categorySlug: 'llm-defenses' },

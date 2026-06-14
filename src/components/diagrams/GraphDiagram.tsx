@@ -101,6 +101,16 @@ export function GraphDiagram({ nodes, links, legend, viewBox, hint }: GraphDiagr
     };
   }
 
+  /* Compute safe viewBox with padding for labels */
+  const LABEL_PAD = 28; // extra space below nodes for labels
+  const EDGE_PAD = 20;  // extra space on sides for text that extends beyond node
+  const safeViewBox = {
+    x: viewBox.x - EDGE_PAD,
+    y: viewBox.y - EDGE_PAD,
+    w: viewBox.w + EDGE_PAD * 2,
+    h: viewBox.h + LABEL_PAD + EDGE_PAD,
+  };
+
   return (
     <div>
       {/* Instruction hint */}
@@ -115,8 +125,9 @@ export function GraphDiagram({ nodes, links, legend, viewBox, hint }: GraphDiagr
 
       <div className="relative w-full overflow-x-auto">
         <svg
-          viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`}
+          viewBox={`${safeViewBox.x} ${safeViewBox.y} ${safeViewBox.w} ${safeViewBox.h}`}
           className="w-full"
+          preserveAspectRatio="xMidYMid meet"
           style={{ maxHeight: 620, minWidth: 320 }}
         >
           <defs>
@@ -141,7 +152,7 @@ export function GraphDiagram({ nodes, links, legend, viewBox, hint }: GraphDiagr
           </defs>
 
           {/* Background grid */}
-          <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#gd-grid)" />
+          <rect x={safeViewBox.x} y={safeViewBox.y} width={safeViewBox.w} height={safeViewBox.h} fill="url(#gd-grid)" />
 
           {/* ─── Links ─── */}
           {links.map((link, i) => {
@@ -165,18 +176,35 @@ export function GraphDiagram({ nodes, links, legend, viewBox, hint }: GraphDiagr
                   strokeDasharray={link.animated ? '6,4' : undefined}
                   markerEnd={!link.animated ? 'url(#gd-arrow)' : undefined}
                 />
-                {link.label && (
-                  <text
-                    x={(fromNode.x + toNode.x) / 2}
-                    y={(fromNode.y + toNode.y) / 2 - 8}
-                    textAnchor="middle"
-                    fill={highlighted ? linkColor : p.linkLabel}
-                    fontSize="10"
-                    fontWeight={highlighted ? 600 : 400}
-                  >
-                    {link.label}
-                  </text>
-                )}
+                {link.label && (() => {
+                  const lx = (fromNode.x + toNode.x) / 2;
+                  const ly = (fromNode.y + toNode.y) / 2 - 10;
+                  const lFontSize = 10;
+                  const lTextWidth = (link.label?.length ?? 0) * lFontSize * 0.55;
+                  return (
+                    <>
+                      <rect
+                        x={lx - lTextWidth / 2 - 3}
+                        y={ly - lFontSize + 1}
+                        width={lTextWidth + 6}
+                        height={lFontSize + 4}
+                        rx={2}
+                        fill={p.panelBg}
+                        opacity={0.8}
+                      />
+                      <text
+                        x={lx}
+                        y={ly}
+                        textAnchor="middle"
+                        fill={highlighted ? linkColor : p.linkLabel}
+                        fontSize={lFontSize}
+                        fontWeight={highlighted ? 600 : 400}
+                      >
+                        {link.label}
+                      </text>
+                    </>
+                  );
+                })()}
                 {link.animated && (
                   <circle r="3" fill={fromNode.color} filter="url(#gd-glow)">
                     <animateMotion
@@ -228,26 +256,54 @@ export function GraphDiagram({ nodes, links, legend, viewBox, hint }: GraphDiagr
                   {node.symbol}
                 </text>
 
-                {/* Label below node */}
-                <text
-                  x={node.x}
-                  y={node.y + r + 14}
-                  textAnchor="middle"
-                  fill={p.labelFill}
-                  fontSize="10"
-                  fontWeight={500}
-                >
-                  {node.label.length > 18 ? node.label.slice(0, 17) + '…' : node.label}
-                </text>
+                {/* Label below node — with background rect for readability */}
+                {(() => {
+                  const labelText = node.label.length > 18 ? node.label.slice(0, 17) + '…' : node.label;
+                  const labelY = node.y + r + 16;
+                  const labelFontSize = 10;
+                  const textWidth = labelText.length * labelFontSize * 0.55;
+                  return (
+                    <>
+                      <rect
+                        x={node.x - textWidth / 2 - 4}
+                        y={labelY - labelFontSize + 1}
+                        width={textWidth + 8}
+                        height={labelFontSize + 4}
+                        rx={3}
+                        fill={p.panelBg}
+                        opacity={0.85}
+                      />
+                      <text
+                        x={node.x}
+                        y={labelY}
+                        textAnchor="middle"
+                        fill={p.labelFill}
+                        fontSize={labelFontSize}
+                        fontWeight={500}
+                      >
+                        {labelText}
+                      </text>
+                    </>
+                  );
+                })()}
               </g>
             );
           })}
 
           {/* ─── Legend ─── */}
           {legend.length > 0 && (
-            <g transform={`translate(${viewBox.x + 16}, ${viewBox.y + viewBox.h - 20})`}>
+            <g transform={`translate(${safeViewBox.x + 16}, ${safeViewBox.y + safeViewBox.h - 16})`}>
+              <rect
+                x={-8}
+                y={-14}
+                width={legend.length * 120 + 8}
+                height={24}
+                rx={4}
+                fill={p.panelBg}
+                opacity={0.8}
+              />
               {legend.map((item, i) => (
-                <g key={i} transform={`translate(${i * 110}, 0)`}>
+                <g key={i} transform={`translate(${i * 120}, 0)`}>
                   <circle cx="0" cy="0" r="5" fill={item.color} />
                   <text x="10" y="4" fill={p.labelFill} fontSize="10">{item.label}</text>
                 </g>

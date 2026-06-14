@@ -60,8 +60,8 @@ function layoutDependencyTree(
   }
 
   // Layout children
-  const childSpacing = 200;
-  const childY = y + 90;
+  const childSpacing = 240;
+  const childY = y + 110;
   const totalChildWidth = children.length * childSpacing;
   const startX = x - totalChildWidth / 2 + childSpacing / 2;
 
@@ -97,14 +97,14 @@ function layoutDependencyTree(
 }
 
 export function DependencyGraphDiagram({ data }: { data: DependencyGraphData }) {
-  const PAD = 60;
-  const startX = 400;
+  const PAD = 80;
+  const startX = 500;
   const startY = PAD + 40;
 
   const result = layoutDependencyTree(data.root, startX, startY, 0, 'root');
 
   const svgW = result.maxWidth + PAD * 2;
-  const svgH = result.maxHeight + PAD + 40;
+  const svgH = result.maxHeight + PAD + 60;
 
   const legend: GraphLegend[] = [
     { color: LEVEL_COLORS[0], label: 'Корень' },

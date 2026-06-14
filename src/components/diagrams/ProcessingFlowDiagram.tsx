@@ -16,9 +16,9 @@ const ROLE_STYLES: Record<string, { color: string; symbol: string; roleLabel: st
 
 export function ProcessingFlowDiagram({ data }: { data: ProcessingFlowDiagramData }) {
   const steps = data.steps;
-  const PAD = 60;
-  const NODE_GAP = 70;
-  const svgW = 500;
+  const PAD = 80;
+  const NODE_GAP = 85;
+  const svgW = 560;
   const svgH = PAD + steps.length * NODE_GAP + PAD;
   const cx = svgW / 2;
 

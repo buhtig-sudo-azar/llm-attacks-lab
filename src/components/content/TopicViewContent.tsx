@@ -12,6 +12,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { MarkdownRenderer } from '@/components/ui/markdown-renderer';
 import { WcdSandbox } from '@/components/sandbox/WcdSandbox';
+import { LlmSandbox } from '@/components/sandbox/LlmSandbox';
 import { DiagramRenderer } from '@/components/diagrams/DiagramRenderer';
 
 function SectionTitle({ icon: Icon, title }: { icon: React.ElementType; title: string }) {
@@ -150,9 +151,12 @@ export function TopicViewContent({ subtopic }: { subtopic: Subtopic }) {
             <FlaskConical className="h-5 w-5 text-primary" />
             <h2 className="text-2xl font-semibold">Интерактивные песочницы</h2>
           </div>
-          {subtopic.sandboxes.map((sandbox, i) => (
-            <WcdSandbox key={i} type={sandbox.type} title={sandbox.title} description={sandbox.description} />
-          ))}
+          {subtopic.sandboxes.map((sandbox, i) => {
+            const isLlmSandbox = !['cache-flow-sim','cache-key-lab','delimiter-lab','path-mapping-lab','normalization-lab','static-rule-lab','attack-builder','cache-defense-lab','header-inspector','url-parser','encoding-lab','request-flow-lab'].includes(sandbox.type);
+            return isLlmSandbox
+              ? <LlmSandbox key={i} type={sandbox.type as any} title={sandbox.title} description={sandbox.description} defaultPrompt={sandbox.defaultPrompt} defaultSystem={sandbox.defaultSystem} />
+              : <WcdSandbox key={i} type={sandbox.type} title={sandbox.title} description={sandbox.description} />;
+          })}
         </div>
       )}
 

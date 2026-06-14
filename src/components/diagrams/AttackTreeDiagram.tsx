@@ -9,9 +9,9 @@ const BRANCH_COLORS = [
 
 export function AttackTreeDiagram({ data }: { data: AttackTreeData }) {
   const branches = data.branches;
-  const PAD = 50;
+  const PAD = 80;
   const BRANCH_GAP = 120;
-  const LEVEL_GAP = 100;
+  const LEVEL_GAP = 120;
 
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
@@ -19,8 +19,8 @@ export function AttackTreeDiagram({ data }: { data: AttackTreeData }) {
 
   // Calculate layout
   const totalBranches = branches.length;
-  const svgW = Math.max(700, totalBranches * 200 + PAD * 2);
-  const svgH = 180 + LEVEL_GAP + branches.reduce((max, b) => Math.max(max, b.items.length), 0) * 70 + PAD * 2;
+  const svgW = Math.max(800, totalBranches * 220 + PAD * 2);
+  const svgH = 220 + LEVEL_GAP + branches.reduce((max, b) => Math.max(max, b.items.length), 0) * 90 + PAD * 2;
 
   const rootX = svgW / 2;
   const rootY = PAD + 40;
@@ -68,7 +68,7 @@ export function AttackTreeDiagram({ data }: { data: AttackTreeData }) {
 
     // Item nodes
     branch.items.forEach((item, j) => {
-      const iy = by + 70 * (j + 1);
+      const iy = by + 85 * (j + 1);
 
       nodes.push({
         id: `item-${i}-${j}`,
